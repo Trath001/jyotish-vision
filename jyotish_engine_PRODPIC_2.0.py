@@ -16,94 +16,108 @@ except:
 try:
     client = genai.Client(api_key=GOOGLE_API_KEY)
 except Exception as e:
-    pass 
+    pass
 
-# --- THEME: ENTERPRISE DARK (ULTRA BRIGHT TEXT) ---
-def inject_custom_css():
+# --- THEME: "MIDAS TOUCH" (PREMIUM GOLD & DARK) ---
+def inject_midas_css():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap');
 
-        /* MAIN BACKGROUND */
+        /* 1. MAIN BACKGROUND - Deep Cosmic Navy */
         .stApp {
-            background-color: #020617;
+            background-color: #050b14;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(251, 191, 36, 0.05) 0px, transparent 50%),
+                radial-gradient(at 50% 0%, rgba(212, 175, 55, 0.1) 0px, transparent 50%),
                 radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.5) 0px, transparent 50%);
             font-family: 'Inter', sans-serif;
         }
 
-        /* TEXT VISIBILITY - FORCE BRIGHT WHITE */
-        h1, h2, h3, h4, h5, h6, p, span, label, div {
-            color: #ffffff !important;
-        }
-        
-        /* HEADERS */
-        h1, h2, h3, h4 {
+        /* 2. TYPOGRAPHY - High Contrast White & Gold */
+        h1, h2, h3 {
             font-family: 'Cinzel', serif !important;
-            color: #fbbf24 !important; /* Gold */
-            text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
-            letter-spacing: 0.5px;
+            background: linear-gradient(to right, #ffd700, #ffecb3, #d4af37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0px 2px 10px rgba(212, 175, 55, 0.3);
+            font-weight: 700 !important;
+        }
+        p, label, span, div {
+            color: #e2e8f0 !important; /* Soft White */
         }
 
-        /* CARDS */
-        .dashboard-card {
-            background: rgba(15, 23, 42, 0.7);
-            border: 1px solid #334155;
+        /* 3. INPUT FIELDS - Fix Visibility Defects */
+        /* Force dark background and white text for ALL inputs */
+        input, .stTextInput > div > div > input {
+            color: #ffffff !important;
+            background-color: #1e293b !important;
+            border-color: #475569 !important;
+        }
+        /* Dropdowns/Selectboxes */
+        .stSelectbox > div > div {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border: 1px solid #475569 !important;
+        }
+        /* Date Picker specific fix */
+        input[type="text"] {
+            color: #ffffff !important; 
+        }
+
+        /* 4. GLASSMORPHISM CARDS */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(212, 175, 55, 0.3); /* Gold border */
             border-radius: 12px;
             padding: 24px;
             margin-bottom: 20px;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
-        /* INPUT FIELDS (Bright Text) */
-        div[data-baseweb="input"], div[data-baseweb="select"] > div {
-            background-color: #1e293b !important;
-            border: 1px solid #475569 !important;
-            color: #ffffff !important; /* White Input Text */
-            border-radius: 6px;
-        }
-        
-        /* DROPDOWN MENU ITEMS */
-        ul[data-baseweb="menu"] li {
-             background-color: #0f172a !important;
-             color: #ffffff !important;
-        }
-        
-        /* BUTTONS */
-        .stButton > button {
-            background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
-            color: white !important;
+        /* 5. BUTTONS - Liquid Gold */
+        div.stButton > button {
+            background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+            color: #000000 !important; /* Black text on gold is readable */
             border: none;
-            font-weight: 600;
-            padding: 0.6rem 1.2rem;
+            font-weight: 700;
+            padding: 0.75rem 1.5rem;
             border-radius: 8px;
-            width: 100%;
             text-transform: uppercase;
             letter-spacing: 1px;
+            transition: all 0.3s ease;
+            width: 100%;
         }
-        .stButton > button:hover {
-            box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+        div.stButton > button:hover {
             transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+            color: #fff !important;
+        }
+
+        /* 6. SIDEBAR - Clean & Dark */
+        [data-testid="stSidebar"] {
+            background-color: #02040a;
+            border-right: 1px solid #334155;
         }
         
-        /* CHAT BUBBLES */
-        .chat-user {
-            background: #334155;
-            padding: 12px;
-            border-radius: 12px 12px 2px 12px;
-            margin: 8px 0;
-            text-align: right;
-            border: 1px solid #475569;
+        /* 7. TABS - Gold Highlights */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px;
         }
-        .chat-ai {
-            background: #1e293b;
-            border: 1px solid #fbbf24;
-            padding: 12px;
-            border-radius: 12px 12px 12px 2px;
-            margin: 8px 0;
-            box-shadow: 0 0 10px rgba(251, 191, 36, 0.1);
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            white-space: pre-wrap;
+            background-color: transparent;
+            border-radius: 4px 4px 0px 0px;
+            gap: 1px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            color: #94a3b8;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: rgba(212, 175, 55, 0.1);
+            color: #fbbf24 !important; /* Gold Text */
+            border-bottom: 2px solid #fbbf24;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -200,8 +214,9 @@ class JyotishEngine:
             for p, data in chart_data.items():
                 if p not in ["Ascendant", "Current_Mahadasha"]: occupants[data['sign']].append(f"{p[:2]} {int(data['degree'])}°")
 
+        # PREMIUM GOLD THEME
         bg_color = "#0f172a"      
-        line_color = "#fbbf24"    # Gold
+        line_color = "#d4af37"    # Metallic Gold
         text_color = "#f8fafc"    # White
         asc_color = "#ef4444"     # Red
 
@@ -210,7 +225,7 @@ class JyotishEngine:
         
         for sign, (r, c) in layout.items():
             x, y = c*100, r*100
-            svg.append(f'<rect x="{x}" y="{y}" width="100" height="100" fill="none" stroke="{line_color}" stroke-width="1" stroke-opacity="0.3"/>')
+            svg.append(f'<rect x="{x}" y="{y}" width="100" height="100" fill="none" stroke="{line_color}" stroke-width="1" stroke-opacity="0.4"/>')
             svg.append(f'<text x="{x+50}" y="{y+55}" text-anchor="middle" fill="{line_color}" font-size="14" font-weight="bold" opacity="0.15">{sign[:3].upper()}</text>')
             if chart_data:
                 y_offset = 20
@@ -222,147 +237,141 @@ class JyotishEngine:
                     y_offset += 15
 
         svg.append(f'<text x="200" y="195" text-anchor="middle" font-size="16" fill="{line_color}" font-weight="bold" font-family="serif">RASHI CHAKRA</text>')
-        if chart_data:
-            svg.append(f'<text x="200" y="215" text-anchor="middle" font-size="10" fill="#94a3b8">Dasha: {chart_data["Current_Mahadasha"]}</text>')
         svg.append('</svg>')
         return "".join(svg)
 
+# --- HELPER FUNCTIONS ---
+def get_lat_lon(city_name):
+    if not city_name: return 21.46, 83.98
+    if "sambalpur" in city_name.lower(): return 21.46, 83.98
+    geolocator = Nominatim(user_agent="jyotish_mitra_app")
+    try:
+        location = geolocator.geocode(city_name)
+        if location: return location.latitude, location.longitude
+        return 21.46, 83.98
+    except: return 21.46, 83.98
+
 # --- MAIN UI ---
 def main():
-    st.set_page_config(page_title="VedaVision Enterprise", layout="wide", page_icon="🕉️")
-    inject_custom_css()
+    st.set_page_config(page_title="VedaVision Pro", layout="wide", page_icon="🕉️")
+    inject_midas_css()
     engine = JyotishEngine()
     
-    # Init State
+    # Init Session State
     if 'form_name' not in st.session_state: st.session_state['form_name'] = ""
     if 'form_dob' not in st.session_state: st.session_state['form_dob'] = None
     if 'ai_planets' not in st.session_state: 
         st.session_state['ai_planets'] = {"Jupiter": "Unknown", "Saturn": "Unknown", "Rahu": "Unknown", "Mars": "Unknown"}
-    if 'chat_history' not in st.session_state: 
-        st.session_state['chat_history'] = [{"role": "ai", "content": "Namaste! I am Jyotish Mitra. Upload a manuscript or use the Demo Mode to begin."}]
-    # Init Chart Data (Placeholder for Preview)
     if 'chart_data' not in st.session_state:
-        # Create a dummy "Today's Chart" for visual preview
+        # Placeholder Chart (Default)
         now = datetime.datetime.now()
         st.session_state['chart_data'] = engine.calculate_chart(now.year, now.month, now.day, 12, 0, 21.46, 83.98)
 
-    # --- SIDEBAR ---
-    with st.sidebar:
-        st.markdown("## 🕉️ VedaVision")
-        st.caption("Enterprise Manuscript Decoder")
-        st.markdown("---")
-        
-        if st.button("⚡ Load Demo Data"):
-            st.session_state['ai_planets'] = {"Jupiter": "Leo", "Saturn": "Leo", "Rahu": "Leo", "Mars": "Leo"}
-            st.session_state['form_name'] = "Demo User"
-            st.session_state['chat_history'].append({"role": "ai", "content": "Demo loaded! I see a planetary conjunction in Leo. Use 'Calculate Date' to find the birth year."})
-            st.rerun()
+    # --- TOP BAR ---
+    st.markdown("## 🕉️ VedaVision Pro")
+    
+    # --- TABS FOR CLEANER UI (SOLVES CONGESTION) ---
+    tab_dashboard, tab_settings = st.tabs(["📊 Main Dashboard", "⚙️ Configuration"])
 
-        st.markdown("### ⚙️ Configuration")
-        doc_language = st.selectbox("Script", ["Odia (ଓଡ଼ିଆ)", "Sanskrit"])
-        manuscript_type = st.radio("Format", ["Palm Leaf", "Paper"])
-        rotation = st.select_slider("Rotate", options=[0, 90, 180, 270])
-        uploaded = st.file_uploader("Upload Scan", type=["jpg","png"])
+    # === TAB 1: DASHBOARD (MAIN WORKSPACE) ===
+    with tab_dashboard:
+        col_left, col_right = st.columns([1, 1.3], gap="large")
 
-        if uploaded and st.button("👁️ Scan Image"):
-            with st.spinner("Analyzing..."):
-                try:
-                    img = Image.open(uploaded[0]) 
-                    if rotation != 0: img = img.rotate(-rotation, expand=True)
-                    if manuscript_type == "Palm Leaf":
-                        img = ImageEnhance.Contrast(ImageOps.grayscale(img)).enhance(2.0)
-                    st.image(img, caption="Enhanced Scan")
-
-                    prompt = f"""
-                    Expert Astrologer Task. Read {doc_language} Chart.
-                    Look for single letters: Gu(Jup), Sha(Sat), Ra(Rahu), Ma(Mars).
-                    RETURN JSON:
-                    {{
-                        "name": "Name or null",
-                        "date": "YYYY-MM-DD or null",
-                        "positions": {{ "Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign" }}
-                    }}
-                    """
-                    resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
-                    data = json.loads(resp.text[resp.text.find('{'):resp.text.rfind('}')+1])
-
-                    st.session_state['form_name'] = data.get('name', "")
-                    if data.get('date'):
-                        try: st.session_state['form_dob'] = datetime.datetime.strptime(data['date'], "%Y-%m-%d").date()
-                        except: pass
-                    
-                    for p, s in data.get('positions', {}).items():
-                        if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
-                    
-                    st.session_state['chat_history'].append({"role": "ai", "content": f"Scan complete! Found: {st.session_state['ai_planets']}."})
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    # --- DASHBOARD ---
-    st.markdown("### 🪐 Planetary Dashboard")
-    col_center, col_right = st.columns([2, 1])
-
-    with col_center:
-        # Verification Card
-        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
-        st.markdown("#### 🕵️ 1. Verification & Date Recovery")
-        rashi_opts = ["Unknown"] + engine.rashi_names
-        c1, c2, c3, c4 = st.columns(4)
-        with c1: p_jup = st.selectbox("Jupiter", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Jupiter", "Unknown")))
-        with c2: p_sat = st.selectbox("Saturn", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Saturn", "Unknown")))
-        with c3: p_rah = st.selectbox("Rahu", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Rahu", "Unknown")))
-        with c4: p_mar = st.selectbox("Mars", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Mars", "Unknown")))
-
-        if st.button("📅 Calculate Date from Planets"):
-            found = engine.find_date_from_positions({"Jupiter": p_jup, "Saturn": p_sat, "Rahu": p_rah, "Mars": p_mar})
-            if found:
-                st.session_state['form_dob'] = found
-                st.session_state['chat_history'].append({"role": "ai", "content": f"Calculated Date: **{found}**."})
-                st.rerun()
-            else:
-                st.error("No match found.")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Chart Card
-        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
-        st.markdown("#### 📜 2. Kundli Generation")
-        with st.form("chart_form"):
-            c_a, c_b = st.columns(2)
-            with c_a:
-                name = st.text_input("Name", st.session_state['form_name'])
-                dob = st.date_input("Date", st.session_state['form_dob'] if st.session_state['form_dob'] else datetime.date(1990,1,1))
-            with c_b:
-                city = st.text_input("City", "Sambalpur")
-                tob = st.time_input("Time", datetime.time(12,0))
+        # LEFT COLUMN: INPUTS & VERIFICATION
+        with col_left:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.markdown("### 📜 1. Manuscript Decoder")
+            st.caption("Upload your Talapatra or Paper Chart to auto-detect planets.")
             
-            if st.form_submit_button("Generate & Analyze"):
-                lat, lon = get_lat_lon(city)
-                st.session_state['chart_data'] = engine.calculate_chart(dob.year, dob.month, dob.day, tob.hour, tob.minute, lat, lon)
-                st.session_state['chat_history'].append({"role": "ai", "content": f"Chart generated for {name}. Ascendant: {st.session_state['chart_data']['Ascendant']['sign']}."})
-                st.rerun()
-        
-        # PREVIEW / ACTUAL CHART RENDER
-        cc1, cc2 = st.columns([1, 1])
-        with cc1:
-            st.markdown(engine.generate_south_indian_svg(st.session_state['chart_data']), unsafe_allow_html=True)
-        with cc2:
-            st.info(f"**Mahadasha:** {st.session_state['chart_data']['Current_Mahadasha']}")
-            st.success(f"**Ascendant:** {st.session_state['chart_data']['Ascendant']['sign']}")
-        st.markdown('</div>', unsafe_allow_html=True)
+            uploaded = st.file_uploader("Upload Image", type=["jpg","png","jpeg"], label_visibility="collapsed")
+            
+            if uploaded and st.button("👁️ Analyze Image"):
+                with st.spinner("Decoding Ancient Script..."):
+                    try:
+                        img = Image.open(uploaded) 
+                        st.image(img, caption="Scanning...", use_column_width=True)
+                        
+                        # AI Prompt
+                        prompt = """
+                        Expert Astrologer Task. Read Odia/Sanskrit Chart.
+                        Look for: Gu(Jup), Sha(Sat), Ra(Rahu), Ma(Mars).
+                        RETURN JSON: {"positions": { "Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign" }}
+                        """
+                        resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
+                        data = json.loads(resp.text[resp.text.find('{'):resp.text.rfind('}')+1])
+                        
+                        for p, s in data.get('positions', {}).items():
+                            if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
+                        st.success("Scan Complete! Please verify below.")
+                    except:
+                        st.error("Could not read image. Please enter planets manually.")
 
-    with col_right:
-        st.markdown('<div class="dashboard-card" style="height: 700px; overflow-y: auto;">', unsafe_allow_html=True)
-        st.markdown("#### 🤖 Jyotish Mitra")
-        for msg in st.session_state['chat_history']:
-            cls = "chat-ai" if msg['role'] == 'ai' else "chat-user"
-            st.markdown(f'<div class="{cls}">{msg["content"]}</div>', unsafe_allow_html=True)
-        
-        user_input = st.text_input("Ask about the chart...", key="chat_in")
-        if user_input:
-            st.session_state['chat_history'].append({"role": "user", "content": user_input})
-            st.session_state['chat_history'].append({"role": "ai", "content": "I am analyzing the planetary positions based on your question..."})
-            st.rerun()
+            st.markdown("---")
+            st.markdown("#### 🕵️ 2. Verification & Date Finder")
+            st.caption("If the date is unknown, select planets seen in the chart.")
+            
+            rashi_opts = ["Unknown"] + engine.rashi_names
+            c1, c2 = st.columns(2)
+            with c1:
+                p_jup = st.selectbox("Jupiter (Gu)", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Jupiter", "Unknown")))
+                p_rah = st.selectbox("Rahu (Ra)", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Rahu", "Unknown")))
+            with c2:
+                p_sat = st.selectbox("Saturn (Sha)", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Saturn", "Unknown")))
+                p_mar = st.selectbox("Mars (Ma)", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Mars", "Unknown")))
+
+            if st.button("📅 Find Lost Date"):
+                found = engine.find_date_from_positions({"Jupiter": p_jup, "Saturn": p_sat, "Rahu": p_rah, "Mars": p_mar})
+                if found:
+                    st.session_state['form_dob'] = found
+                    st.success(f"Date Recovered: {found}")
+                else:
+                    st.error("No exact match found in 1900-2005.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # RIGHT COLUMN: KUNDLI OUTPUT
+        with col_right:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.markdown("### ✨ Janma Kundli")
+            
+            # --- DEFECT FIX: YEAR RANGE ---
+            # Explicitly setting min_value to 1800 to fix the "1980 limit" bug
+            min_date = datetime.date(1800, 1, 1)
+            default_date = st.session_state['form_dob'] if st.session_state['form_dob'] else datetime.date(1990, 1, 1)
+            
+            with st.form("chart_gen"):
+                c_a, c_b = st.columns(2)
+                with c_a:
+                    name = st.text_input("Name", value="Unknown")
+                    dob = st.date_input("Date of Birth", value=default_date, min_value=min_date)
+                with c_b:
+                    city = st.text_input("Place", value="Sambalpur")
+                    tob = st.time_input("Time", datetime.time(12,0))
+                
+                if st.form_submit_button("GENERATE CHART"):
+                    lat, lon = get_lat_lon(city)
+                    st.session_state['chart_data'] = engine.calculate_chart(dob.year, dob.month, dob.day, tob.hour, tob.minute, lat, lon)
+                    st.rerun()
+
+            # Render Chart
+            st.markdown(engine.generate_south_indian_svg(st.session_state['chart_data']), unsafe_allow_html=True)
+            
+            # Data Cards
+            dasha = st.session_state['chart_data'].get('Current_Mahadasha', 'Unknown')
+            asc = st.session_state['chart_data'].get('Ascendant', {}).get('sign', 'Unknown')
+            
+            k1, k2 = st.columns(2)
+            k1.info(f"**Ascendant:** {asc}")
+            k2.success(f"**Mahadasha:** {dasha}")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    # === TAB 2: SETTINGS (MOVED HERE TO FIX CONGESTION) ===
+    with tab_settings:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### ⚙️ Global Settings")
+        doc_language = st.selectbox("Manuscript Language", ["Odia (ଓଡ଼ିଆ)", "Sanskrit", "Hindi"])
+        manuscript_type = st.radio("Document Type", ["Palm Leaf (Talapatra)", "Paper"])
+        rotation = st.select_slider("Image Rotation Correction", options=[0, 90, 180, 270], value=0)
+        st.info("ℹ️ Settings are applied automatically to the next scan.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
