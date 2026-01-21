@@ -21,7 +21,9 @@ except Exception as e:
     st.error(f"Error initializing API client: {e}")
 
 class JyotishEngine:
-    # ... (Keep the __init__, get_nakshatra, calculate_current_dasha, calculate_chart, generate_south_indian_svg, get_lat_lon methods EXACTLY the same as before) ...
+    """
+    Production-ready class to handle Vedic Calculations.
+    """
     
     def __init__(self):
         # Set Lahiri Ayanamsa (Critical for Vedic accuracy)
@@ -203,14 +205,14 @@ def main():
     st.set_page_config(page_title="VedaVision AI", layout="wide")
     engine = JyotishEngine()
     
-    if 'form_name' not in st.session_state: st.session_state['form_name'] = "User"
-    if 'form_dob' not in st.session_state: st.session_state['form_dob'] = datetime.date(1990, 1, 1)
+    if 'form_name' not in st.session_state: st.session_state['form_name'] = "" # Reset to empty
+    if 'form_dob' not in st.session_state: st.session_state['form_dob'] = None # Reset to empty
     if 'form_tob' not in st.session_state: st.session_state['form_tob'] = datetime.time(12, 0)
-    if 'form_city' not in st.session_state: st.session_state['form_city'] = "New Delhi, India"
+    if 'form_city' not in st.session_state: st.session_state['form_city'] = ""
 
     st.sidebar.title("Kundli Decoder")
     
-    # --- RESTORED: LANGUAGE SELECTOR ---
+    # --- LANGUAGE SELECTOR ---
     doc_language = st.sidebar.selectbox(
         "Script Language", 
         ["Odia (ଓଡ଼ିଆ)", "Sanskrit", "Hindi", "English", "Telugu"]
@@ -222,33 +224,33 @@ def main():
         ["Modern Paper (Blue Ink)", "Palm Leaf (Talapatra)"]
     )
     
-    # --- NEW: ROTATION CONTROL ---
-    if manuscript_type == "Palm Leaf (Talapatra)":
-        rotation = st.sidebar.select_slider("Rotate Image (If vertical)", options=[0, 90, 180, 270], value=0)
-    else:
-        rotation = 0
+    # --- ROTATION CONTROL ---
+    st.sidebar.markdown("### 🔄 Image Tools")
+    rotation = st.sidebar.select_slider("Rotate Image (If vertical)", options=[0, 90, 180, 270], value=0)
 
     uploaded_files = st.sidebar.file_uploader(
-        "Upload Images (Front/Back)", 
+        "Upload Images", 
         type=["jpg", "png", "jpeg"], 
         accept_multiple_files=True
     )
     
     if uploaded_files:
         if st.sidebar.button("Decipher Manuscript"):
-            with st.spinner(f"Analyzing {manuscript_type} in {doc_language}..."):
+            with st.spinner(f"Analyzing {manuscript_type}..."):
                 try:
                     # Process the first image
                     image = Image.open(uploaded_files[0])
                     
-                    # APPLY ROTATION
+                    # 1. APPLY ROTATION
                     if rotation != 0:
-                        image = image.rotate(-rotation, expand=True) # Negative for Clockwise feel
+                        image = image.rotate(-rotation, expand=True)
 
-                    # Apply enhancement ONLY for Talapatra
+                    # 2. Apply enhancement
                     if manuscript_type == "Palm Leaf (Talapatra)":
                         image = enhance_manuscript(image)
-                        st.sidebar.image(image, caption=f"AI Input (Enhanced + Rotated {rotation}°)", use_column_width=True)
+                        st.sidebar.image(image, caption=f"AI Input (Enhanced)", use_column_width=True)
+                    else:
+                        st.sidebar.image(image, caption="AI Input", use_column_width=True)
 
                     # --- DYNAMIC PROMPT SELECTION ---
                     if manuscript_type == "Modern Paper (Blue Ink)":
@@ -264,18 +266,21 @@ def main():
                         RETURN JSON: {{"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "..."}}
                         """
                     else:
-                        # --- STRONGER TALAPATRA PROMPT ---
+                        # --- STRICT NO-HALLUCINATION PROMPT ---
                         prompt = f"""
-                        You are an expert Paleographer specializing in Ancient {doc_language} Palm Leaf (Talapatra) Manuscripts.
-                        The image has been converted to Grayscale and High Contrast to show the etchings.
+                        You are an expert Paleographer specializing in Ancient {doc_language} Palm Leaf (Talapatra).
+                        The text is incised/etched.
                         
-                        **YOUR MISSION: Decode the Incised Karani Script.**
-                        1. **ORIENTATION CHECK:** Ensure you are reading the lines horizontally.
-                        2. **FIND THE CHART:** Look for the Rashi Chakra (Circular Chart).
-                        3. **FIND NUMERALS:** Look for Odia numerals embedded in the text.
-                        4. **DETECT KEYWORDS:** Look for "Saka", "San", "Masa" (Month), "Dina" (Day).
+                        **YOUR MISSION:**
+                        1. **DO NOT HALLUCINATE.** If you cannot clearly read a date, return null.
+                        2. **LOOK FOR CIRCLES:** The image likely contains a "Rashi Chakra" (Zodiac Wheel).
+                        3. **LOOK FOR NUMERALS:** Search for Odia numerals etched in the lines.
+                        4. **READ THE NAME:** Look for 'Sriman' or 'Namadheya'.
+
+                        **CRITICAL RULE:** Do NOT output "1994" or any random date unless it is WRITTEN in the image.
                         
-                        RETURN JSON: {{"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "Unknown"}}
+                        RETURN JSON: {{"name": null, "date": null, "time": null, "city": null}}
+                        (Replace null with strings ONLY if you are 100% sure).
                         """
                     
                     response = client.models.generate_content(
@@ -289,19 +294,29 @@ def main():
                     data = json.loads(json_str)
                     
                     # Auto-Fill
-                    st.session_state['form_name'] = data.get('name') or "User"
+                    st.session_state['form_name'] = data.get('name') or ""
+                    
                     if data.get('date'):
                         try:
                             clean_date = data['date'].replace('/', '-').replace('.', '-')
                             st.session_state['form_dob'] = datetime.datetime.strptime(clean_date, "%Y-%m-%d").date()
-                        except: pass
+                        except: 
+                            st.session_state['form_dob'] = None
+                    else:
+                        st.session_state['form_dob'] = None
+
                     if data.get('time'):
                         try:
                             st.session_state['form_tob'] = datetime.datetime.strptime(data['time'], "%H:%M").time()
-                        except: pass
-                    st.session_state['form_city'] = data.get('city') or "Unknown"
+                        except: 
+                            st.session_state['form_tob'] = None
                     
-                    st.sidebar.success("Deciphered! Please review fields below.")
+                    st.session_state['form_city'] = data.get('city') or ""
+                    
+                    if st.session_state['form_dob'] is None:
+                        st.sidebar.warning("⚠️ Could not read the date clearly from the Talapatra. Please enter it manually.")
+                    else:
+                        st.sidebar.success("Deciphered! Please review fields below.")
                     
                 except Exception as e:
                     st.sidebar.error(f"Extraction failed. AI Response: {e}")
@@ -311,8 +326,14 @@ def main():
     # --- MANUAL FORM ---
     with st.sidebar.form("birth_details"):
         name = st.text_input("Name", st.session_state['form_name'])
-        dob = st.date_input("Date of Birth", st.session_state['form_dob'], min_value=datetime.date(1900, 1, 1))
-        tob = st.time_input("Time of Birth", st.session_state['form_tob'])
+        
+        # Safe Date Input
+        default_date = st.session_state['form_dob'] if st.session_state['form_dob'] else datetime.date(1990, 1, 1)
+        dob = st.date_input("Date of Birth", default_date, min_value=datetime.date(1800, 1, 1))
+        
+        # Safe Time Input
+        default_time = st.session_state['form_tob'] if st.session_state['form_tob'] else datetime.time(12, 0)
+        tob = st.time_input("Time of Birth", default_time)
         
         manual_coords = st.checkbox("Enter Coordinates Manually?")
         if manual_coords:
