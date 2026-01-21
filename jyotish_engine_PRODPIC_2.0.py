@@ -5,116 +5,101 @@ import datetime
 from geopy.geocoders import Nominatim
 from PIL import Image, ImageEnhance, ImageOps
 import json
+import time
 
 # --- CONFIGURATION ---
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 except:
-    # User must set this in Streamlit Cloud Secrets
     GOOGLE_API_KEY = "PASTE_YOUR_API_KEY_HERE"
 
 try:
     client = genai.Client(api_key=GOOGLE_API_KEY)
 except Exception as e:
-    st.error(f"Error initializing API client: {e}")
+    pass # UI handles error gracefully
 
-# --- THEME: VEDIC DARK DASHBOARD (HIGH CONTRAST) ---
+# --- THEME: ENTERPRISE DARK DASHBOARD ---
 def inject_custom_css():
     st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap');
 
-        /* Main App Background - Deep Navy */
+        /* APP BACKGROUND */
         .stApp {
-            background-color: #020617; /* Darker base */
-            background-image: radial-gradient(at 50% 0%, #1e293b 0%, #020617 80%);
-            color: #ffffff !important; /* PURE WHITE TEXT */
+            background-color: #020617;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(251, 191, 36, 0.03) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.5) 0px, transparent 50%);
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
         }
 
-        /* Titles & Headers - Cinzel Font (Gold) */
-        h1, h2, h3 {
-            font-family: 'Cinzel', serif !important;
-            color: #fbbf24 !important; /* Amber-400 */
-            text-shadow: 0px 0px 15px rgba(251, 191, 36, 0.4);
-            font-weight: 700 !important;
-        }
-        
-        /* Regular Text / Paragraphs */
-        p, label, span {
-            color: #f8fafc !important; /* Slate-50 (Near White) */
-            font-size: 1.05rem !important;
-        }
-
-        /* Sidebar - Darker Navy */
+        /* SIDEBAR STYLING */
         [data-testid="stSidebar"] {
-            background-color: #0b1120;
-            border-right: 1px solid #334155;
+            background-color: #0b1121;
+            border-right: 1px solid #1e293b;
         }
 
-        /* Custom "Card" Container */
-        .vedic-card {
-            background: rgba(15, 23, 42, 0.6); /* Slate-900 transparent */
-            border: 1px solid #475569;
+        /* HEADERS */
+        h1, h2, h3, h4 {
+            font-family: 'Cinzel', serif !important;
+            color: #fbbf24 !important; /* Amber Gold */
+            letter-spacing: 0.5px;
+        }
+
+        /* CARDS (GLASSMORPHISM) */
+        .dashboard-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid #334155;
             border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
+            padding: 20px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(12px);
+            transition: transform 0.2s;
         }
-        .vedic-card h4 {
-            color: #fbbf24 !important;
-            margin-top: 0;
-            border-bottom: 1px solid #475569;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
+        .dashboard-card:hover {
+            border-color: #fbbf24;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
         }
 
-        /* Buttons - Gold Gradient */
-        div.stButton > button {
-            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+        /* BUTTONS */
+        .stButton > button {
+            background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
             color: white !important;
-            border: 1px solid #f59e0b;
-            font-family: 'Lato', sans-serif;
-            font-weight: bold;
-            font-size: 16px;
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
+            border: none;
+            font-weight: 600;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            width: 100%;
         }
-        div.stButton > button:hover {
-            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
-            border-color: #fff;
-            transform: translateY(-2px);
+        .stButton > button:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
         }
 
-        /* Inputs - Dark Fields */
+        /* INPUT FIELDS */
         div[data-baseweb="input"], div[data-baseweb="select"] > div {
             background-color: #1e293b !important;
-            border: 1px solid #64748b !important;
+            border: 1px solid #475569 !important;
             color: white !important;
             border-radius: 6px;
         }
         
-        /* Dropdown Text Fix */
-        ul[data-baseweb="menu"] li {
-             background-color: #1e293b !important;
-             color: white !important;
+        /* CHAT BUBBLES */
+        .chat-user {
+            background-color: #334155;
+            padding: 10px;
+            border-radius: 10px 10px 0 10px;
+            margin: 5px 0;
+            text-align: right;
         }
-
-        /* Success/Info Boxes */
-        .stSuccess {
-            background-color: rgba(6, 78, 59, 0.8) !important;
-            border: 1px solid #34d399;
-            color: #ecfdf5 !important;
-        }
-        .stInfo {
-            background-color: rgba(30, 58, 138, 0.6) !important;
-            border: 1px solid #60a5fa;
-            color: #eff6ff !important;
-        }
-        
-        /* Tooltip Icons */
-        .stTooltipIcon {
-            color: #fbbf24 !important;
+        .chat-ai {
+            background-color: #1e293b;
+            border: 1px solid #fbbf24;
+            padding: 10px;
+            border-radius: 10px 10px 10px 0;
+            margin: 5px 0;
+            color: #e2e8f0;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -127,7 +112,6 @@ class JyotishEngine:
         self.dasha_years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
         self.nakshatra_names = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
-    # --- CALCULATIONS ---
     def get_nakshatra(self, longitude):
         idx = int(longitude / 13.33333333)
         return self.nakshatra_names[idx % 27], int((longitude % 13.33333333) / 3.33333333) + 1
@@ -163,7 +147,6 @@ class JyotishEngine:
         chart_data["Current_Mahadasha"] = self.calculate_current_dasha(moon_abs, datetime.date(year, month, day))
         return chart_data
 
-    # --- REVERSE SEARCH ---
     def find_date_from_positions(self, observed_positions, start_year=1900, end_year=2005):
         valid_targets = {k: v for k, v in observed_positions.items() if v and v != "Unknown"}
         if not valid_targets: return None
@@ -205,7 +188,6 @@ class JyotishEngine:
                 d += datetime.timedelta(days=1)
         return None
 
-    # --- DARK MODE CHART ---
     def generate_south_indian_svg(self, chart_data):
         layout = {"Pisces": (0,0), "Aries": (0,1), "Taurus": (0,2), "Gemini": (0,3), "Aquarius": (1,0), "Cancer": (1,3), "Capricorn": (2,0), "Leo": (2,3), "Sagittarius": (3,0), "Scorpio": (3,1), "Libra": (3,2), "Virgo": (3,3)}
         occupants = {k: [] for k in layout}
@@ -213,186 +195,5 @@ class JyotishEngine:
         for p, data in chart_data.items():
             if p not in ["Ascendant", "Current_Mahadasha"]: occupants[data['sign']].append(f"{p[:2]} {int(data['degree'])}°")
 
-        bg_color = "#1e293b"      # Card background
-        line_color = "#f59e0b"    # Gold
-        text_color = "#f1f5f9"    # High-vis white
-        asc_color = "#ef4444"     # Red
-
-        svg = [f'<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" style="background-color: {bg_color}; border-radius: 8px;">']
-        svg.append(f'<rect x="2" y="2" width="396" height="396" fill="none" stroke="{line_color}" stroke-width="2"/>')
-        
-        for sign, (r, c) in layout.items():
-            x, y = c*100, r*100
-            svg.append(f'<rect x="{x}" y="{y}" width="100" height="100" fill="none" stroke="{line_color}" stroke-width="1" stroke-opacity="0.5"/>')
-            svg.append(f'<text x="{x+50}" y="{y+55}" text-anchor="middle" fill="{line_color}" font-size="14" font-weight="bold" opacity="0.15">{sign[:3].upper()}</text>')
-            y_offset = 20
-            for item in occupants[sign]:
-                is_asc = "Asc" in item
-                fill = asc_color if is_asc else text_color
-                weight = "bold" if is_asc else "normal"
-                svg.append(f'<text x="{x+5}" y="{y+y_offset}" fill="{fill}" font-weight="{weight}" font-size="11" font-family="sans-serif">{item}</text>')
-                y_offset += 15
-
-        svg.append(f'<text x="200" y="195" text-anchor="middle" font-size="16" fill="{line_color}" font-weight="bold" font-family="serif">RASHI CHAKRA</text>')
-        svg.append(f'<text x="200" y="215" text-anchor="middle" font-size="10" fill="#94a3b8">Dasha: {chart_data["Current_Mahadasha"]}</text>')
-        svg.append('</svg>')
-        return "".join(svg)
-
-# --- HELPER FUNCTIONS ---
-def get_lat_lon(city_name):
-    if not city_name: return 21.46, 83.98
-    if "sambalpur" in city_name.lower(): return 21.46, 83.98
-    geolocator = Nominatim(user_agent="jyotish_mitra_app")
-    try:
-        location = geolocator.geocode(city_name)
-        if location: return location.latitude, location.longitude
-        return 21.46, 83.98
-    except: return 21.46, 83.98
-
-# --- MAIN UI ---
-def main():
-    st.set_page_config(page_title="VedaVision Pro", layout="wide", page_icon="🔮")
-    inject_custom_css()
-    engine = JyotishEngine()
-    
-    # Init State
-    if 'form_name' not in st.session_state: st.session_state['form_name'] = ""
-    if 'form_dob' not in st.session_state: st.session_state['form_dob'] = None
-    if 'ai_planets' not in st.session_state: 
-        st.session_state['ai_planets'] = {"Jupiter": "Unknown", "Saturn": "Unknown", "Rahu": "Unknown", "Mars": "Unknown"}
-
-    # --- SIDEBAR ---
-    with st.sidebar:
-        st.markdown("## 🔮 VedaVision Pro")
-        st.markdown("---")
-        
-        # Guide for new users
-        with st.expander("👋 Start Here (User Guide)", expanded=True):
-            st.info("""
-            **How to use:**
-            1. **Upload** your manuscript image.
-            2. **Select Type**: 'Palm Leaf' enables special filters for etched text.
-            3. **Scan**: AI will try to read the date.
-            4. **Verify**: If date is missing, correct the planets in the main dashboard.
-            """)
-
-        st.markdown("### 🛠️ Configuration")
-        
-        doc_language = st.selectbox(
-            "Script Language", 
-            ["Odia (ଓଡ଼ିଆ)", "Sanskrit", "Hindi"],
-            help="Select the language written on the manuscript. This changes which symbols the AI looks for."
-        )
-        
-        manuscript_type = st.radio(
-            "Document Format", 
-            ["Palm Leaf", "Paper"],
-            help="Select 'Palm Leaf' to activate high-contrast filters for reading etched/carved text."
-        )
-        
-        rotation = st.select_slider(
-            "Image Orientation", 
-            options=[0, 90, 180, 270],
-            help="If your photo is vertical (tall), rotate it 90° so the text runs left-to-right."
-        )
-        
-        uploaded = st.file_uploader(
-            "Upload Manuscript", 
-            type=["jpg","png","jpeg"], 
-            accept_multiple_files=True,
-            help="Upload clear photos of the Janma Patrika. Flash photography works best for Palm Leaves."
-        )
-
-        if uploaded and st.button("👁️ Analyze Image", help="Click to start the AI Vision processing."):
-            with st.spinner("Decoding ancient script..."):
-                try:
-                    img = Image.open(uploaded[0]) 
-                    if rotation != 0: img = img.rotate(-rotation, expand=True)
-                    if manuscript_type == "Palm Leaf":
-                        img = ImageEnhance.Contrast(ImageOps.grayscale(img)).enhance(2.0)
-                    st.image(img, caption="Enhanced Input")
-
-                    prompt = f"""
-                    Expert Astrologer Task. Read {doc_language} Chart.
-                    Look for single letters: Gu(Jup), Sha(Sat), Ra(Rahu), Ma(Mars).
-                    RETURN JSON:
-                    {{
-                        "name": "Name or null",
-                        "date": "YYYY-MM-DD or null",
-                        "positions": {{ "Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign" }}
-                    }}
-                    """
-                    resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
-                    data = json.loads(resp.text[resp.text.find('{'):resp.text.rfind('}')+1])
-
-                    st.session_state['form_name'] = data.get('name', "")
-                    if data.get('date'):
-                        try: st.session_state['form_dob'] = datetime.datetime.strptime(data['date'], "%Y-%m-%d").date()
-                        except: pass
-                    
-                    for p, s in data.get('positions', {}).items():
-                        if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
-                    
-                    st.toast("Analysis Complete", icon="✨")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    # --- MAIN DASHBOARD ---
-    st.markdown("### 📜 Manuscript Decoder & Kundli Generator")
-
-    if st.session_state['form_dob'] is None:
-         st.info("ℹ️ **Status:** No date found yet. Upload a chart or enter planets below.")
-
-    col1, col2 = st.columns([1, 1.2])
-
-    # LEFT CARD: VERIFICATION
-    with col1:
-        st.markdown('<div class="vedic-card">', unsafe_allow_html=True)
-        st.markdown("#### 🕵️ Planetary Verification")
-        st.markdown("""
-        **Instructions:**
-        1. Look at the chart on the left.
-        2. If the AI missed a planet (marked 'Unknown'), select its Sign manually.
-        3. Click 'Calculate Date' to find the birth year.
-        """)
-        
-        rashi_opts = ["Unknown"] + engine.rashi_names
-        c1, c2 = st.columns(2)
-        with c1:
-            p_jup = st.selectbox("Jupiter (ଗୁ)", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Jupiter", "Unknown")), help="Look for the symbol 'Gu' or 'Bri'")
-            p_rah = st.selectbox("Rahu (ରା)", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Rahu", "Unknown")), help="Look for the symbol 'Ra'")
-        with c2:
-            p_sat = st.selectbox("Saturn (ଶ)", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Saturn", "Unknown")), help="Look for the symbol 'Sha' or 'Shani'")
-            p_mar = st.selectbox("Mars (ମ)", rashi_opts, index=rashi_opts.index(st.session_state['ai_planets'].get("Mars", "Unknown")), help="Look for the symbol 'Ma' or 'Mangala'")
-
-        if st.button("📅 Calculate Date", help="Uses astronomical data to find when these planets aligned."):
-            found = engine.find_date_from_positions({"Jupiter": p_jup, "Saturn": p_sat, "Rahu": p_rah, "Mars": p_mar})
-            if found:
-                st.session_state['form_dob'] = found
-                st.success(f"Date Recovered: {found}")
-            else:
-                st.error("No match found between 1900-2005. Check planets.")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # RIGHT CARD: OUTPUT
-    with col2:
-        st.markdown('<div class="vedic-card">', unsafe_allow_html=True)
-        st.markdown("#### ✨ Kundli Output")
-        
-        with st.form("chart_form"):
-            c_a, c_b = st.columns(2)
-            with c_a:
-                name = st.text_input("Name", st.session_state['form_name'], help="Name of the person (found in manuscript or manual entry).")
-                dob = st.date_input("Date", st.session_state['form_dob'] if st.session_state['form_dob'] else datetime.date(1990,1,1), help="Date of Birth.")
-            with c_b:
-                city = st.text_input("City", "Sambalpur", help="Place of birth (used for Lat/Lon coordinates).")
-                tob = st.time_input("Time", datetime.time(12,0), help="Time of Birth (Estimate 12:00 if unknown).")
-            
-            if st.form_submit_button("Generate Chart", help="Create the final South Indian chart."):
-                lat, lon = get_lat_lon(city)
-                chart = engine.calculate_chart(dob.year, dob.month, dob.day, tob.hour, tob.minute, lat, lon)
-                st.markdown(engine.generate_south_indian_svg(chart), unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    main()
+        bg_color = "#0f172a"      
+        line_color = "#fbbf24"    # Gold
