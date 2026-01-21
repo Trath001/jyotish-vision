@@ -11,6 +11,7 @@ import re
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 except:
+    # User must set this in Streamlit Cloud Secrets
     GOOGLE_API_KEY = "PASTE_YOUR_API_KEY_HERE"
 
 try:
@@ -26,7 +27,7 @@ class JyotishEngine:
         self.dasha_lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
         self.dasha_years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
 
-    # --- CALCULATIONS ---
+    # --- FORWARD CALCULATION ---
     def get_nakshatra(self, longitude):
         idx = int(longitude / 13.33333333)
         return self.nakshatra_names[idx % 27], int((longitude % 13.33333333) / 3.33333333) + 1
@@ -51,23 +52,29 @@ class JyotishEngine:
         ayanamsa = swe.get_ayanamsa_ut(jd)
         
         planets = {"Sun": swe.SUN, "Moon": swe.MOON, "Mars": swe.MARS, "Mercury": swe.MERCURY, "Jupiter": swe.JUPITER, "Venus": swe.VENUS, "Saturn": swe.SATURN, "Rahu": swe.MEAN_NODE}
-        chart = {}
+        chart_data = {}
         
-        for p, pid in planets.items():
-            pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)[0][0]
-            chart[p] = {"sign": self.rashi_names[int(pos/30)], "degree": pos%30}
-            
-        asc_val = (swe.houses(jd, lat, lon)[1][0] - ayanamsa) % 360
-        chart["Ascendant"] = {"sign": self.rashi_names[int(asc_val/30)], "degree": asc_val%30}
-        
-        moon_abs = (self.rashi_names.index(chart["Moon"]["sign"]) * 30) + chart["Moon"]["degree"]
-        chart["Current_Mahadasha"] = self.calculate_current_dasha(moon_abs, datetime.date(year, month, day))
-        return chart
+        for name, pid in planets.items():
+            pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL | swe.FLG_SWIEPH)[0][0]
+            sign_idx = int(pos / 30)
+            nak, pada = self.get_nakshatra(pos)
+            chart_data[name] = {"sign": self.rashi_names[sign_idx], "degree": round(pos % 30, 2), "nakshatra": nak}
 
-    # --- REVERSE SEARCH (DETECTIVE) ---
-    def find_date_from_positions(self, observed_positions, start_year=1950, end_year=2005):
-        if not observed_positions: return None
+        houses = swe.houses(jd, lat, lon)[1]
+        asc_val = (houses[0] - ayanamsa) % 360
+        nak, pada = self.get_nakshatra(asc_val)
+        chart_data["Ascendant"] = {"sign": self.rashi_names[int(asc_val / 30)], "degree": round(asc_val % 30, 2), "nakshatra": nak}
         
+        moon_abs = (self.rashi_names.index(chart_data["Moon"]["sign"]) * 30) + chart_data["Moon"]["degree"]
+        chart_data["Current_Mahadasha"] = self.calculate_current_dasha(moon_abs, datetime.date(year, month, day))
+        return chart_data
+
+    # --- REVERSE SEARCH (ROBUST) ---
+    def find_date_from_positions(self, observed_positions, start_year=1900, end_year=2005):
+        # Filter out empty/None values
+        valid_targets = {k: v for k, v in observed_positions.items() if v and v != "Unknown"}
+        if not valid_targets: return None
+
         start_date = datetime.date(start_year, 1, 1)
         end_date = datetime.date(end_year, 12, 31)
         delta = datetime.timedelta(days=15)
@@ -79,19 +86,17 @@ class JyotishEngine:
         while current_date <= end_date:
             jd = swe.julday(current_date.year, current_date.month, current_date.day)
             match = True
-            checks = 0
             
-            for p_name, p_target in observed_positions.items():
-                if p_name not in planet_map or not p_target: continue
-                checks += 1
+            for p_name, p_target in valid_targets.items():
+                if p_name not in planet_map: continue
                 pid = planet_map[p_name]
                 pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)[0][0]
                 curr_sign = self.rashi_names[int(pos / 30)]
-                if curr_sign.lower() != str(p_target).lower():
+                if curr_sign.lower() != p_target.lower():
                     match = False
                     break
             
-            if match and checks > 0: candidates.append(current_date)
+            if match: candidates.append(current_date)
             current_date += delta
         
         # 2. Fine Search
@@ -102,14 +107,13 @@ class JyotishEngine:
                 jd = swe.julday(d.year, d.month, d.day)
                 daily_match = True
                 
-                for p_name, p_target in observed_positions.items():
-                    if not p_target: continue
+                for p_name, p_target in valid_targets.items():
                     pid_map = {"Sun": swe.SUN, "Mars": swe.MARS, "Jupiter": swe.JUPITER, "Saturn": swe.SATURN, "Rahu": swe.MEAN_NODE}
                     if p_name in pid_map:
                         pid = pid_map[p_name]
                         pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)[0][0]
                         curr_sign = self.rashi_names[int(pos / 30)]
-                        if curr_sign.lower() != str(p_target).lower():
+                        if curr_sign.lower() != p_target.lower():
                             daily_match = False
                             break
                 
@@ -145,12 +149,16 @@ def get_lat_lon(city_name):
         return 21.46, 83.98
     except: return 21.46, 83.98
 
-# --- UI ---
+# --- MAIN UI ---
 def main():
     st.set_page_config(page_title="VedaVision Pro", layout="wide")
     engine = JyotishEngine()
     
-    if 'form_name' not in st.session_state: st.session_state.update({'form_name': "", 'form_dob': None, 'form_city': "", 'ai_debug': ""})
+    # Session State (Initialize Planets to 'Unknown')
+    if 'form_name' not in st.session_state: st.session_state['form_name'] = ""
+    if 'form_dob' not in st.session_state: st.session_state['form_dob'] = None
+    if 'ai_planets' not in st.session_state: 
+        st.session_state['ai_planets'] = {"Jupiter": "Unknown", "Saturn": "Unknown", "Rahu": "Unknown", "Mars": "Unknown"}
 
     st.sidebar.title("VedaVision Pro")
     
@@ -160,97 +168,100 @@ def main():
     
     uploaded = st.sidebar.file_uploader("Upload Manuscript", type=["jpg","png","jpeg"], accept_multiple_files=True)
 
-    if uploaded and st.sidebar.button("Analyze"):
-        with st.spinner("Processing..."):
+    # --- STEP 1: AI SCAN ---
+    if uploaded and st.sidebar.button("Scan Manuscript"):
+        with st.spinner("AI Reading..."):
             try:
                 img = Image.open(uploaded[0]) 
                 if rotation != 0: img = img.rotate(-rotation, expand=True)
                 if manuscript_type == "Palm Leaf (Talapatra)":
-                    img = ImageEnhance.Contrast(ImageOps.grayscale(img)).enhance(2.5)
-                
+                    img = ImageEnhance.Contrast(ImageOps.grayscale(img)).enhance(2.0)
                 st.sidebar.image(img, caption="AI Vision Input")
 
-                # --- THE ROSETTA STONE PROMPT ---
-                if manuscript_type == "Palm Leaf (Talapatra)":
-                    prompt = f"""
-                    You are an expert Paleographer reading Ancient {doc_language} Rashi Chakra (Zodiac Wheel).
-                    
-                    **CRITICAL: DECODE ABBREVIATIONS**
-                    The planets are likely written as Single Letter Abbreviations. 
-                    LOOK FOR THESE CHARACTERS INSIDE THE CHART SECTIONS:
-                    
-                    * **Jupiter:** 'ଗୁ' (Gu), 'ବୃ' (Bri), or 'Jup' -> Output: "Jupiter"
-                    * **Saturn:** 'ଶ' (Sha), 'ଶନି' (Shani), or 'Sat' -> Output: "Saturn"
-                    * **Rahu:** 'ରା' (Ra), 'ର' (Ra), or 'Rah' -> Output: "Rahu"
-                    * **Mars:** 'ମ' (Ma), 'ମଂ' (Mangala), or 'Mar' -> Output: "Mars"
-                    * **Sun:** 'ର' (Rabi), 'ସୂ' (Surya), or 'Sun' -> Output: "Sun"
-                    * **Moon:** 'ଚ' (Cha), 'ଚନ୍ଦ୍ର' (Chandra), or 'Mon' -> Output: "Moon"
-
-                    **TASK:** 1. Identify which Sign (Mesh, Vrish, etc.) contains these letters.
-                    2. Return JSON.
-
-                    RETURN JSON ONLY:
-                    {{
-                        "name": "Visible Name or null",
-                        "date": null,
-                        "positions": {{
-                            "Jupiter": "SignName (e.g. Aries) or null",
-                            "Saturn": "SignName or null",
-                            "Rahu": "SignName or null",
-                            "Mars": "SignName or null"
-                        }}
+                prompt = f"""
+                You are an expert reading {doc_language} Astrology Charts.
+                
+                IF PALM LEAF: Look for abbreviations inside the Rashi Chakra (Wheel).
+                * 'ଗୁ'/'ବୃ' = Jupiter
+                * 'ଶ'/'ଶନି' = Saturn
+                * 'ରା'/'ର' = Rahu
+                * 'ମ'/'ମଂ' = Mars
+                
+                RETURN JSON ONLY:
+                {{
+                    "name": "Visible Name or null",
+                    "date": "YYYY-MM-DD or null",
+                    "positions": {{
+                        "Jupiter": "SignName (e.g. Aries) or null",
+                        "Saturn": "SignName or null",
+                        "Rahu": "SignName or null",
+                        "Mars": "SignName or null"
                     }}
-                    """
-                else:
-                    # PAPER PROMPT (Existing)
-                    prompt = f"""
-                    Analyze this {doc_language} Paper Manuscript.
-                    1. Find Name (after Namni/Nama).
-                    2. Find Place (after Gram/Jilla).
-                    3. Find Date/Time (Odia numerals).
-                    RETURN JSON: {{"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "..."}}
-                    """
+                }}
+                """
                 
                 resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
                 
-                try:
-                    txt = resp.text
-                    json_str = txt[txt.find('{'):txt.rfind('}')+1]
-                    data = json.loads(json_str)
-                except:
-                    st.error("AI Output was not valid JSON.")
-                    st.stop()
+                # Robust JSON Parse
+                txt = resp.text
+                json_str = txt[txt.find('{'):txt.rfind('}')+1]
+                data = json.loads(json_str)
 
+                # Update State
                 st.session_state['form_name'] = data.get('name', "")
-                
                 if data.get('date'):
-                    st.session_state['form_dob'] = datetime.datetime.strptime(data['date'], "%Y-%m-%d").date()
-                    st.sidebar.success("✅ Date found in text!")
-                else:
-                    st.sidebar.warning("Text date missing. Checking abbreviations...")
-                    positions = data.get('positions', {})
-                    clean_pos = {k: v for k, v in positions.items() if v} 
-                    
-                    st.session_state['ai_debug'] = f"Decoded Planets: {clean_pos}"
-                    
-                    if clean_pos:
-                        found_date = engine.find_date_from_positions(clean_pos)
-                        if found_date:
-                            st.session_state['form_dob'] = found_date
-                            st.sidebar.success(f"🧮 Calculated Date: {found_date}")
-                        else:
-                            st.sidebar.error("Planets found, but no matching date (1950-2005).")
-                    else:
-                        st.sidebar.error("No abbreviations found. Try rotating or checking the image.")
+                    try:
+                        st.session_state['form_dob'] = datetime.datetime.strptime(data['date'], "%Y-%m-%d").date()
+                    except: pass
+                
+                # Update Planet Dropdowns (Only update if AI found something)
+                ai_pos = data.get('positions', {})
+                for p, s in ai_pos.items():
+                    if s and s in engine.rashi_names:
+                        st.session_state['ai_planets'][p] = s
+                
+                st.sidebar.success("Scan Complete! Please Verify Planets below.")
 
             except Exception as e:
-                st.error(f"System Error: {e}")
+                st.sidebar.error(f"Scan Error (Try again): {e}")
 
-    if st.session_state['ai_debug']: st.sidebar.info(st.session_state['ai_debug'])
     st.sidebar.markdown("---")
 
+    # --- STEP 2: VERIFY & CALCULATE ---
+    st.sidebar.subheader("🪐 Verify Planets (Planetary Detective)")
+    st.sidebar.caption("AI auto-fills this. Correct any 'Unknown' or wrong values to find the date.")
+    
+    # Dropdowns for Planets
+    rashi_options = ["Unknown"] + engine.rashi_names
+    
+    def get_index(p_name):
+        val = st.session_state['ai_planets'].get(p_name, "Unknown")
+        return rashi_options.index(val) if val in rashi_options else 0
+
+    p_jup = st.sidebar.selectbox("Jupiter", rashi_options, index=get_index("Jupiter"))
+    p_sat = st.sidebar.selectbox("Saturn", rashi_options, index=get_index("Saturn"))
+    p_rah = st.sidebar.selectbox("Rahu", rashi_options, index=get_index("Rahu"))
+    p_mar = st.sidebar.selectbox("Mars", rashi_options, index=get_index("Mars"))
+
+    # Calculate Button
+    if st.sidebar.button("🕵️ Find Date from These Planets"):
+        # Build the 'Observed Positions' map from the dropdowns
+        current_map = {"Jupiter": p_jup, "Saturn": p_sat, "Rahu": p_rah, "Mars": p_mar}
+        
+        with st.spinner("Searching 1900-2005..."):
+            found_date = engine.find_date_from_positions(current_map)
+            if found_date:
+                st.session_state['form_dob'] = found_date
+                st.sidebar.success(f"✅ MATCH FOUND: {found_date}")
+            else:
+                st.sidebar.error("No date matches this combination. Try changing one planet.")
+
+    st.sidebar.markdown("---")
+
+    # --- STEP 3: FINAL OUTPUT ---
     with st.sidebar.form("details"):
         name = st.text_input("Name", st.session_state['form_name'])
+        
         safe_dob = st.session_state['form_dob'] if st.session_state['form_dob'] else datetime.date(1990,1,1)
         dob = st.date_input("DOB", safe_dob)
         tob = st.time_input("Time", datetime.time(12,0))
