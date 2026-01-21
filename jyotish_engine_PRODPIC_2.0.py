@@ -9,21 +9,11 @@ import json
 import re
 
 # --- CONFIGURATION ---
-# 🔴 PASTE YOUR API KEY HERE
-#GOOGLE_API_KEY = "YOUR api key"
-# --- CONFIGURATION ---
 try:
-    # Try getting the key from Streamlit Secrets (Cloud)
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 except:
-    # Fallback for local testing (Optional, or keep it blank)
-    GOOGLE_API_KEY = "PASTE_YOUR_KEY_ONLY_FOR_LOCAL_TESTING"
+    GOOGLE_API_KEY = "PASTE_YOUR_API_KEY_HERE_FOR_LOCAL_TESTING"
 
-# Initialize Client
-try:
-    client = genai.Client(api_key=GOOGLE_API_KEY)
-except Exception as e:
-    st.error(f"Error initializing API client: {e}")
 # Initialize Client
 try:
     client = genai.Client(api_key=GOOGLE_API_KEY)
@@ -179,9 +169,9 @@ class JyotishEngine:
 
 # --- HELPER: CITY SEARCH ---
 def get_lat_lon(city_name):
-    # Smart Fallback for Odia locations including Sambalpur
+    # Smart Fallback for Odia locations
     if "sambalpur" in city_name.lower() or "burla" in city_name.lower() or "hirakud" in city_name.lower():
-        return 21.46, 83.98  # Sambalpur Coordinates
+        return 21.46, 83.98
     if "jaykaypur" in city_name.lower() or "jk paper" in city_name.lower():
         return 19.25, 83.42 
     if "rayagada" in city_name.lower():
@@ -198,196 +188,127 @@ def get_lat_lon(city_name):
 
 # --- MAIN APP ---
 def main():
-    st.set_page_config(page_title="Jyotish Mitra Pro", layout="wide")
+    st.set_page_config(page_title="VedaVision AI", layout="wide")
     engine = JyotishEngine()
     
-    # --- SESSION STATE INITIALIZATION ---
     if 'form_name' not in st.session_state: st.session_state['form_name'] = "User"
     if 'form_dob' not in st.session_state: st.session_state['form_dob'] = datetime.date(1990, 1, 1)
     if 'form_tob' not in st.session_state: st.session_state['form_tob'] = datetime.time(12, 0)
     if 'form_city' not in st.session_state: st.session_state['form_city'] = "New Delhi, India"
 
-    st.sidebar.title("Kundli Details")
+    st.sidebar.title("Kundli Decoder")
     
-    # --- OPTION A: UPLOAD MANUSCRIPT (VISION) ---
-    st.sidebar.subheader("📷 Upload Manuscript / Palm Leaf")
-    
-    doc_language = st.sidebar.selectbox(
-        "Script Language", 
-        ["Odia (ଓଡ଼ିଆ)", "English", "Hindi", "Sanskrit", "Tamil", "Telugu", "Malayalam", "Kannada", "Bengali"]
+    # --- MANUSCRIPT TYPE SELECTOR ---
+    manuscript_type = st.sidebar.radio(
+        "Select Manuscript Type",
+        ["Modern Paper (Blue Ink)", "Palm Leaf (Talapatra)"]
     )
     
     uploaded_file = st.sidebar.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
     
     if uploaded_file is not None:
         if st.sidebar.button("Decipher Manuscript"):
-            with st.spinner(f"Reading {doc_language} Manuscript..."):
+            with st.spinner(f"Analyzing {manuscript_type}..."):
                 try:
                     image = Image.open(uploaded_file)
                     
-                    # --- THE "SAMBALPUR + 3:55" PROMPT ---
-                    prompt = f"""
-                    You are an expert Paleographer specializing in {doc_language} Manuscripts.
-                    Analyze this image of a 'Janma Patrika'.
+                    # --- DYNAMIC PROMPT SELECTION ---
+                    if manuscript_type == "Modern Paper (Blue Ink)":
+                        prompt = """
+                        You are an expert Paleographer specializing in Odia Paper Manuscripts.
+                        Analyze this image of a 'Janma Patrika'.
+                        
+                        **YOUR MISSION: Read Handwriting (Blue Ink) Precisely.**
+                        1. **FIND THE NAME:** Look for 'Namni' (Female) or 'Nama'. Read text after it.
+                        2. **FIND THE PLACE:** Look for 'Gram' or 'Jilla'. Check for 'Sambalpur', 'Rayagada', 'Jaykaypur'.
+                        3. **CONFIRM TIME:** Look at Odia numerals. `୫`=5, `୪`=4. (e.g. `୫୫`=55).
+                        
+                        RETURN JSON: {"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "..."}
+                        """
+                    else:
+                        # --- NEW: TALAPATRA PROMPT ---
+                        prompt = """
+                        You are an expert Paleographer specializing in Ancient Odia Palm Leaf (Talapatra) Manuscripts.
+                        Analyze this image. The text is etched/incised (Karani script), not printed.
+
+                        **YOUR MISSION:**
+                        1. **IGNORE PRINTED HEADERS:** There are no 'Namni' or 'Jilla' labels.
+                        2. **READ THE ETCHING:** Look for Odia numerals embedded in the long text rows or columns.
+                        3. **FIND THE CIRCLES:** If there are circular charts (Rashi Chakra), look for planetary symbols inside.
+                        4. **DETECT DATE/TIME:** Look for keywords like "Saka" (ଶକ), "San" (ସନ), or "Danda" (ଦଣ୍ଡ).
+                        5. **DETECT NAME:** Often found after "Sriman" or at the very start.
+
+                        RETURN JSON: {"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "Unknown"}
+                        """
                     
-                    **YOUR MISSION: Read Handwriting Precisely.**
-
-                    1. **FIND THE NAME (Use 'Namni' clue):**
-                       - Find printed "Namni" (Female Name) or "Nama".
-                       - Read the handwritten text *after* it.
-                       - Example: "Sarojini", "Snehalata".
-
-                    2. **FIND THE PLACE (Target: Sambalpur District):**
-                       - Look for "Gram" (Village) or "Jilla" (District).
-                       - **Check specifically for 'Sambalpur' (ସମ୍ବଲପୁର).**
-                       - Or 'Burla', 'Hirakud', 'Kuchinda'.
-                       - Output exactly what you see.
-
-                    3. **CONFIRM TIME (Target: 3:55):**
-                       - Look at the Odia numerals for minutes.
-                       - `୪` is 4. `୫` is 5.
-                       - If you see `୫୫`, it is 55. If `୪୫`, it is 45.
-                       - **The handwriting likely says 3.55 (or 15:55). Verify this.**
-
-                    RETURN ONLY VALID JSON:
-                    {{"name": "...", "date": "1994-12-13", "time": "15:55", "city": "..."}}
-                    """
-                    
-                    # VISION TASK: Use Gemini 2.0 Flash
                     response = client.models.generate_content(
                         model='gemini-2.0-flash', 
                         contents=[prompt, image]
                     )
                     
-                    # Parse JSON
+                    # Parse JSON safely
                     txt = response.text
                     json_str = txt[txt.find('{'):txt.rfind('}')+1]
                     data = json.loads(json_str)
                     
-                    # Auto-Fill Form
+                    # Auto-Fill
                     st.session_state['form_name'] = data.get('name') or "User"
                     if data.get('date'):
                         try:
                             clean_date = data['date'].replace('/', '-').replace('.', '-')
                             st.session_state['form_dob'] = datetime.datetime.strptime(clean_date, "%Y-%m-%d").date()
-                        except:
-                            pass
-                            
+                        except: pass
                     if data.get('time'):
                         try:
                             st.session_state['form_tob'] = datetime.datetime.strptime(data['time'], "%H:%M").time()
-                        except:
-                             st.sidebar.warning(f"Extracted time '{data.get('time')}' is tricky. Please verify.")
-                            
+                        except: pass
                     st.session_state['form_city'] = data.get('city') or "Unknown"
                     
-                    st.sidebar.success("Deciphered! Please review the extracted data.")
+                    st.sidebar.success("Deciphered! Please review fields below.")
                     
                 except Exception as e:
-                    st.sidebar.error(f"Extraction failed. AI Response was: {e}")
+                    st.sidebar.error(f"Extraction failed. AI Response: {e}")
 
     st.sidebar.markdown("---")
 
-    # --- OPTION B: MANUAL FORM (Auto-filled) ---
-    st.sidebar.subheader("✍️ Verify & Generate")
+    # --- MANUAL FORM ---
     with st.sidebar.form("birth_details"):
         name = st.text_input("Name", st.session_state['form_name'])
-        
-        dob = st.date_input(
-            "Date of Birth", 
-            st.session_state['form_dob'], 
-            min_value=datetime.date(1900, 1, 1)
-        )
-        
+        dob = st.date_input("Date of Birth", st.session_state['form_dob'], min_value=datetime.date(1900, 1, 1))
         tob = st.time_input("Time of Birth", st.session_state['form_tob'])
         
-        # Manual Coordinates Checkbox
         manual_coords = st.checkbox("Enter Coordinates Manually?")
-        city = ""
-        lat, lon = 0.0, 0.0
-        
         if manual_coords:
             col_a, col_b = st.columns(2)
-            with col_a: lat = st.number_input("Latitude", value=21.46) # Default Sambalpur
+            with col_a: lat = st.number_input("Latitude", value=21.46)
             with col_b: lon = st.number_input("Longitude", value=83.98)
         else:
             city = st.text_input("Birth City", st.session_state['form_city'])
+            lat, lon = 0.0, 0.0
         
         submit = st.form_submit_button("Generate Kundli")
 
     if submit:
-        found_location = False
-        
-        if manual_coords:
-            found_location = True
-            st.success(f"Using Manual Coordinates: {lat}, {lon}")
-        else:
+        if not manual_coords:
             with st.spinner(f"Locating {city}..."):
                 lat, lon = get_lat_lon(city)
-                if lat is None:
-                    st.error(f"Could not find '{city}'. Try a bigger city nearby or use Manual Mode.")
-                else:
-                    found_location = True
-                    st.success(f"Found {city}: {lat:.2f}, {lon:.2f}")
-
-        if found_location:
-            chart_data = engine.calculate_chart(
-                dob.year, dob.month, dob.day, tob.hour, tob.minute, lat, lon
-            )
-            st.session_state['chart_data'] = chart_data
-            st.session_state['user_name'] = name
-
-    # DISPLAY RESULTS
-    if 'chart_data' in st.session_state:
-        data = st.session_state['chart_data']
-        col1, col2 = st.columns([1, 2])
+                if lat is None: st.error(f"City '{city}' not found.")
         
-        with col1:
-            st.markdown(engine.generate_south_indian_svg(data), unsafe_allow_html=True)
-            st.info(f"**Current Mahadasha:** {data['Current_Mahadasha']}")
+        if lat:
+            chart_data = engine.calculate_chart(dob.year, dob.month, dob.day, tob.hour, tob.minute, lat, lon)
             
-        with col2:
-            st.subheader(f"Ask Jyotish Mitra about {st.session_state['user_name']}'s chart")
-            user_q = st.chat_input("Ex: When will my career improve?")
-            
-            if user_q:
-                # Prepare Context
-                context_str = f"""
-                Birth Data: {st.session_state['user_name']}, Dasha: {data['Current_Mahadasha']}
-                Planetary Positions:
-                Ascendant: {data['Ascendant']['sign']} ({data['Ascendant']['nakshatra']})
-                Sun: {data['Sun']['sign']} ({data['Sun']['nakshatra']})
-                Moon: {data['Moon']['sign']} ({data['Moon']['nakshatra']})
-                Mars: {data['Mars']['sign']}
-                Mercury: {data['Mercury']['sign']}
-                Jupiter: {data['Jupiter']['sign']}
-                Venus: {data['Venus']['sign']}
-                Saturn: {data['Saturn']['sign']}
-                Rahu: {data['Rahu']['sign']}
-                Ketu: {data['Ketu']['sign']}
-                """
-                
-                full_prompt = f"""
-                You are an expert Vedic Astrologer. Analyze the following chart data rigidly using Parashari principles.
-                CHART CONTEXT: {context_str}
-                USER QUESTION: {user_q}
-                GUIDELINES:
-                1. Look at the Current Mahadasha ({data['Current_Mahadasha']}).
-                2. Mention Nakshatras if relevant.
-                3. Be practical and empathetic.
-                """
-                
-                with st.spinner("Consulting the stars..."):
-                    try:
-                        # STABLE CHAT MODEL: gemini-2.0-flash
-                        response = client.models.generate_content(
-                            model='gemini-2.0-flash',
-                            contents=full_prompt
-                        )
-                        st.markdown(response.text)
-                    except Exception as e:
-                        st.error(f"AI Error: {e}")
-                        st.warning("Please check your API Key and internet connection.")
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown(engine.generate_south_indian_svg(chart_data), unsafe_allow_html=True)
+                st.info(f"**Mahadasha:** {chart_data['Current_Mahadasha']}")
+            with col2:
+                st.subheader(f"Ask about {name}'s chart")
+                user_q = st.chat_input("Ex: Health prediction?")
+                if user_q:
+                    with st.spinner("Consulting..."):
+                        context = f"Chart: {chart_data}"
+                        res = client.models.generate_content(model='gemini-2.0-flash', contents=f"Role: Vedic Astrologer. Context: {context}. Question: {user_q}")
+                        st.markdown(res.text)
 
 if __name__ == "__main__":
     main()
