@@ -4,7 +4,7 @@ import swisseph as swe
 import datetime
 import pytz
 from geopy.geocoders import Nominatim
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageOps, ImageFilter
 import json
 import re
 
@@ -21,9 +21,7 @@ except Exception as e:
     st.error(f"Error initializing API client: {e}")
 
 class JyotishEngine:
-    """
-    Production-ready class to handle Vedic Calculations.
-    """
+    # ... (Keep the __init__, get_nakshatra, calculate_current_dasha, calculate_chart, generate_south_indian_svg, get_lat_lon methods EXACTLY the same as before) ...
     
     def __init__(self):
         # Set Lahiri Ayanamsa (Critical for Vedic accuracy)
@@ -166,16 +164,20 @@ class JyotishEngine:
         svg.append(f'<text x="200" y="215" text-anchor="middle" font-size="12" fill="#666">Running Dasha: {chart_data["Current_Mahadasha"]}</text>')
         svg.append('</svg>')
         return "".join(svg)
-
-# --- HELPER: IMAGE ENHANCER FOR TALAPATRA ---
-def enhance_manuscript(image):
-    # Increase Contrast to make etching visible
-    enhancer = ImageEnhance.Contrast(image)
-    image = enhancer.enhance(2.0)  # Double the contrast
     
-    # Increase Sharpness
+# --- HELPER: ADVANCED TALAPATRA ENHANCER ---
+def enhance_manuscript(image):
+    # 1. Convert to Grayscale (Removes the pink/red color distraction)
+    image = ImageOps.grayscale(image)
+    
+    # 2. Increase Contrast dramatically to make etchings stand out
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2.5) 
+    
+    # 3. Sharpen edges to define the Karani script
     enhancer = ImageEnhance.Sharpness(image)
-    image = enhancer.enhance(2.0)
+    image = enhancer.enhance(3.0)
+    
     return image
 
 # --- HELPER: CITY SEARCH ---
@@ -220,7 +222,12 @@ def main():
         ["Modern Paper (Blue Ink)", "Palm Leaf (Talapatra)"]
     )
     
-    # --- RESTORED: MULTIPLE FILE UPLOAD ---
+    # --- NEW: ROTATION CONTROL ---
+    if manuscript_type == "Palm Leaf (Talapatra)":
+        rotation = st.sidebar.select_slider("Rotate Image (If vertical)", options=[0, 90, 180, 270], value=0)
+    else:
+        rotation = 0
+
     uploaded_files = st.sidebar.file_uploader(
         "Upload Images (Front/Back)", 
         type=["jpg", "png", "jpeg"], 
@@ -231,13 +238,17 @@ def main():
         if st.sidebar.button("Decipher Manuscript"):
             with st.spinner(f"Analyzing {manuscript_type} in {doc_language}..."):
                 try:
-                    # Process the first image (usually the main page)
+                    # Process the first image
                     image = Image.open(uploaded_files[0])
                     
+                    # APPLY ROTATION
+                    if rotation != 0:
+                        image = image.rotate(-rotation, expand=True) # Negative for Clockwise feel
+
                     # Apply enhancement ONLY for Talapatra
                     if manuscript_type == "Palm Leaf (Talapatra)":
                         image = enhance_manuscript(image)
-                        st.sidebar.image(image, caption="Enhanced View (AI sees this)", use_column_width=True)
+                        st.sidebar.image(image, caption=f"AI Input (Enhanced + Rotated {rotation}°)", use_column_width=True)
 
                     # --- DYNAMIC PROMPT SELECTION ---
                     if manuscript_type == "Modern Paper (Blue Ink)":
@@ -256,12 +267,12 @@ def main():
                         # --- STRONGER TALAPATRA PROMPT ---
                         prompt = f"""
                         You are an expert Paleographer specializing in Ancient {doc_language} Palm Leaf (Talapatra) Manuscripts.
-                        The image has been contrast-enhanced to show the etchings.
+                        The image has been converted to Grayscale and High Contrast to show the etchings.
                         
                         **YOUR MISSION: Decode the Incised Karani Script.**
-                        1. **IGNORE PRINTED HEADERS:** There are none. Look for the flow of text.
-                        2. **FIND NUMERALS:** Look for Odia numerals etched in the lines. They often appear in a grid or circle.
-                        3. **FIND THE CHART:** Look for the Circular Rashi Chakra. The planetary symbols are inside the wedges.
+                        1. **ORIENTATION CHECK:** Ensure you are reading the lines horizontally.
+                        2. **FIND THE CHART:** Look for the Rashi Chakra (Circular Chart).
+                        3. **FIND NUMERALS:** Look for Odia numerals embedded in the text.
                         4. **DETECT KEYWORDS:** Look for "Saka", "San", "Masa" (Month), "Dina" (Day).
                         
                         RETURN JSON: {{"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "Unknown"}}
