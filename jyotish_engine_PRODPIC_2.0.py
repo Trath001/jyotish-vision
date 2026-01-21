@@ -18,7 +18,7 @@ try:
 except Exception as e:
     pass
 
-# --- THEME: "MIDAS TOUCH" (TITANIUM CSS OVERRIDES) ---
+# --- THEME: "MIDAS TOUCH" (TITANIUM CSS) ---
 def inject_midas_css():
     st.markdown("""
         <style>
@@ -33,8 +33,14 @@ def inject_midas_css():
             font-family: 'Inter', sans-serif;
         }
 
-        /* 2. TEXT COLOR FORCE (White/Gold) */
-        h1, h2, h3, h4 {
+        /* 2. TEXT VISIBILITY */
+        h1, h2, h3, h4, h5, h6, p, label, div, span, button {
+            color: #ffffff !important;
+        }
+        .stMarkdown p { color: #e2e8f0 !important; }
+
+        /* 3. GOLD HEADERS */
+        h1, h2, h3 {
             font-family: 'Cinzel', serif !important;
             background: linear-gradient(to right, #ffd700, #ffecb3, #d4af37);
             -webkit-background-clip: text;
@@ -42,11 +48,8 @@ def inject_midas_css():
             text-shadow: 0px 2px 12px rgba(212, 175, 55, 0.3);
             font-weight: 700 !important;
         }
-        p, label, span, div, small {
-            color: #e2e8f0 !important;
-        }
 
-        /* 3. NATIVE CONTAINER BORDERS (The Gold Box) */
+        /* 4. NATIVE CONTAINERS */
         div[data-testid="stVerticalBlockBorderWrapper"] {
             background-color: rgba(30, 41, 59, 0.3);
             border: 1px solid rgba(212, 175, 55, 0.2) !important;
@@ -56,29 +59,31 @@ def inject_midas_css():
             margin-bottom: 1rem;
         }
 
-        /* 4. CRITICAL FIX: INPUTS & DATE PICKERS (Removing White Boxes) */
+        /* 5. INPUT FIXES (No White Boxes) */
         div[data-baseweb="input"] {
             background-color: #1e293b !important;
             border: 1px solid #475569 !important; 
             border-radius: 6px;
         }
-        div[data-baseweb="input"] > div {
-            background-color: transparent !important;
-        }
-        input {
-            color: #ffffff !important;
-            caret-color: #fbbf24;
-        }
+        div[data-baseweb="input"] > div { background-color: transparent !important; }
+        input { color: #ffffff !important; caret-color: #fbbf24; }
         
-        /* 5. CRITICAL FIX: FILE UPLOADER */
+        /* 6. DROPDOWN FIXES */
+        div[data-baseweb="select"] > div {
+            background-color: #1e293b !important;
+            border: 1px solid #475569 !important;
+            color: white !important;
+        }
+        ul[data-baseweb="menu"] { background-color: #0f172a !important; }
+        ul[data-baseweb="menu"] li { color: #ffffff !important; }
+        
+        /* 7. FILE UPLOADER FIX */
         [data-testid="stFileUploaderDropzone"] {
             background-color: #1e293b !important;
             border: 1px dashed #d4af37 !important;
             border-radius: 10px;
         }
-        [data-testid="stFileUploaderDropzone"] div, 
-        [data-testid="stFileUploaderDropzone"] span, 
-        [data-testid="stFileUploaderDropzone"] small {
+        [data-testid="stFileUploaderDropzone"] div, [data-testid="stFileUploaderDropzone"] span, [data-testid="stFileUploaderDropzone"] small {
             color: #cbd5e1 !important;
         }
         [data-testid="stFileUploaderDropzone"] button {
@@ -87,20 +92,7 @@ def inject_midas_css():
             border: 1px solid #64748b !important;
         }
 
-        /* 6. SELECT/DROPDOWN BOXES */
-        div[data-baseweb="select"] > div {
-            background-color: #1e293b !important;
-            border: 1px solid #475569 !important;
-            color: white !important;
-        }
-        ul[data-baseweb="menu"] {
-            background-color: #0f172a !important;
-        }
-        ul[data-baseweb="menu"] li {
-            color: #ffffff !important;
-        }
-        
-        /* 7. BUTTONS (Liquid Gold Gradient) */
+        /* 8. GOLD BUTTONS */
         div.stButton > button {
             background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
             color: #000 !important;
@@ -223,10 +215,9 @@ def main():
 
     # --- HEADER ---
     st.markdown("## 🕉️ VedaVision Pro")
-    st.caption("AI-Powered Manuscript Decoder & Precision Kundli Engine")
 
     # --- TABS ---
-    tab1, tab2 = st.tabs(["📊 DASHBOARD", "⚙️ CONFIGURATION"])
+    tab1, tab2 = st.tabs(["📊 DASHBOARD", "⚙️ SETTINGS"])
 
     # === TAB 1: DASHBOARD ===
     with tab1:
@@ -238,26 +229,25 @@ def main():
             with st.container(border=True):
                 st.markdown("### 📜 1. Manuscript Decoder")
                 
-                # Check config setting
-                ms_type = st.session_state.get('ms_type', 'Palm Leaf (Talapatra)')
-                st.caption(f"Current Mode: **{ms_type}**")
-
+                # --- VISIBLE TOGGLE FOR MODE ---
+                mode = st.radio("Document Type", ["Palm Leaf (Talapatra)", "Paper (Text)"], horizontal=True)
+                
                 uploaded = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
                 
                 if uploaded and st.button("👁️ SCAN IMAGE"):
-                    with st.spinner("Analyzing Document..."):
+                    with st.spinner(f"Decoding {mode}..."):
                         try:
                             img = Image.open(uploaded)
                             st.image(img, caption="Scanning...", use_column_width=True)
                             
-                            # --- DUAL MODE LOGIC (THE FIX) ---
-                            if ms_type == "Paper":
-                                # MODE 1: OCR TEXT READER
+                            # --- PROMPT LOGIC ---
+                            if mode == "Paper (Text)":
                                 prompt = """
-                                Analyze this Horoscope Document.
-                                1. Read the 'Name' written in English or Odia.
-                                2. Read 'Date of Birth' (DOB) and 'Time of Birth' (TOB).
-                                3. If a Rashi Chakra is visible, identify planet signs.
+                                Analyze this Paper Horoscope.
+                                1. OCR Extract 'Name'.
+                                2. OCR Extract 'Date of Birth' (YYYY-MM-DD).
+                                3. OCR Extract 'Time of Birth' (HH:MM).
+                                4. If chart is visible, extract planet signs.
                                 RETURN JSON:
                                 {
                                     "name": "Text found",
@@ -267,37 +257,41 @@ def main():
                                 }
                                 """
                             else:
-                                # MODE 2: SYMBOL READER
                                 prompt = """
-                                Analyze this Palm Leaf Chart.
+                                Analyze this Palm Leaf.
                                 Identify planetary symbols: Gu(Jup), Sha(Sat), Ra(Rahu), Ma(Mars).
                                 RETURN JSON: {"positions": {"Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign"}}
                                 """
                             
                             resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
                             txt = resp.text
-                            data = json.loads(txt[txt.find('{'):txt.rfind('}')+1])
-
-                            # Update State
-                            if data.get('name'): st.session_state['form_name'] = data['name']
-                            if data.get('date'): 
-                                try: st.session_state['form_dob'] = datetime.datetime.strptime(data['date'], "%Y-%m-%d").date()
-                                except: pass
-                            if data.get('time'):
-                                try: st.session_state['form_tob'] = datetime.datetime.strptime(data['time'], "%H:%M").time()
-                                except: pass
+                            # Robust JSON extraction
+                            json_match = re.search(r'\{.*\}', txt, re.DOTALL)
+                            if json_match:
+                                data = json.loads(json_match.group())
                                 
-                            for p, s in data.get('positions', {}).items():
-                                if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
-                            
-                            st.success("Scan Complete!")
-                            st.rerun()
-                        except: st.error("Could not read image. Please enter details manually.")
+                                # Update State
+                                if data.get('name'): st.session_state['form_name'] = data['name']
+                                if data.get('date'): 
+                                    try: st.session_state['form_dob'] = datetime.datetime.strptime(data['date'], "%Y-%m-%d").date()
+                                    except: pass
+                                if data.get('time'):
+                                    try: st.session_state['form_tob'] = datetime.datetime.strptime(data['time'], "%H:%M").time()
+                                    except: pass
+                                    
+                                for p, s in data.get('positions', {}).items():
+                                    if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
+                                
+                                st.success("Scan Complete!")
+                                st.rerun()
+                            else:
+                                st.error("AI response was not valid JSON.")
+                        except Exception as e: 
+                            st.error(f"Scan failed: {e}")
 
             # 2. VERIFICATION CARD
             with st.container(border=True):
                 st.markdown("### 🕵️ 2. Verification & Date Finder")
-                st.caption("Verify planets below to calculate date (if text scan failed).")
                 
                 ropts = ["Unknown"] + engine.rashi_names
                 c1, c2 = st.columns(2)
@@ -313,7 +307,7 @@ def main():
                     if found:
                         st.session_state['form_dob'] = found
                         st.success(f"Recovered Date: {found}")
-                    else: st.error("No exact match found. Try adjusting Mars.")
+                    else: st.error("No exact match found.")
 
         # RIGHT COLUMN
         with col_R:
@@ -345,14 +339,12 @@ def main():
     # === TAB 2: CONFIG ===
     with tab2:
         with st.container(border=True):
-            st.markdown("### ⚙️ Global Settings")
+            st.markdown("### ⚙️ Advanced Settings")
             c1, c2 = st.columns(2)
             with c1:
                 st.selectbox("Script Language", ["Odia", "Sanskrit", "Hindi"])
-                st.session_state['ms_type'] = st.radio("Manuscript Type", ["Palm Leaf (Talapatra)", "Paper"], key="ms_type_radio")
             with c2:
                 st.select_slider("Image Rotation", options=[0, 90, 180, 270])
-            st.info("ℹ️ Select 'Paper' to enable Blue Ink Text Reading (Name/DOB).")
 
 if __name__ == "__main__":
     main()
