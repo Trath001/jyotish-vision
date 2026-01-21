@@ -4,7 +4,7 @@ import swisseph as swe
 import datetime
 import pytz
 from geopy.geocoders import Nominatim
-from PIL import Image
+from PIL import Image, ImageEnhance
 import json
 import re
 
@@ -167,9 +167,19 @@ class JyotishEngine:
         svg.append('</svg>')
         return "".join(svg)
 
+# --- HELPER: IMAGE ENHANCER FOR TALAPATRA ---
+def enhance_manuscript(image):
+    # Increase Contrast to make etching visible
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2.0)  # Double the contrast
+    
+    # Increase Sharpness
+    enhancer = ImageEnhance.Sharpness(image)
+    image = enhancer.enhance(2.0)
+    return image
+
 # --- HELPER: CITY SEARCH ---
 def get_lat_lon(city_name):
-    # Smart Fallback for Odia locations
     if "sambalpur" in city_name.lower() or "burla" in city_name.lower() or "hirakud" in city_name.lower():
         return 21.46, 83.98
     if "jaykaypur" in city_name.lower() or "jk paper" in city_name.lower():
@@ -198,24 +208,41 @@ def main():
 
     st.sidebar.title("Kundli Decoder")
     
+    # --- RESTORED: LANGUAGE SELECTOR ---
+    doc_language = st.sidebar.selectbox(
+        "Script Language", 
+        ["Odia (ଓଡ଼ିଆ)", "Sanskrit", "Hindi", "English", "Telugu"]
+    )
+
     # --- MANUSCRIPT TYPE SELECTOR ---
     manuscript_type = st.sidebar.radio(
         "Select Manuscript Type",
         ["Modern Paper (Blue Ink)", "Palm Leaf (Talapatra)"]
     )
     
-    uploaded_file = st.sidebar.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+    # --- RESTORED: MULTIPLE FILE UPLOAD ---
+    uploaded_files = st.sidebar.file_uploader(
+        "Upload Images (Front/Back)", 
+        type=["jpg", "png", "jpeg"], 
+        accept_multiple_files=True
+    )
     
-    if uploaded_file is not None:
+    if uploaded_files:
         if st.sidebar.button("Decipher Manuscript"):
-            with st.spinner(f"Analyzing {manuscript_type}..."):
+            with st.spinner(f"Analyzing {manuscript_type} in {doc_language}..."):
                 try:
-                    image = Image.open(uploaded_file)
+                    # Process the first image (usually the main page)
+                    image = Image.open(uploaded_files[0])
                     
+                    # Apply enhancement ONLY for Talapatra
+                    if manuscript_type == "Palm Leaf (Talapatra)":
+                        image = enhance_manuscript(image)
+                        st.sidebar.image(image, caption="Enhanced View (AI sees this)", use_column_width=True)
+
                     # --- DYNAMIC PROMPT SELECTION ---
                     if manuscript_type == "Modern Paper (Blue Ink)":
-                        prompt = """
-                        You are an expert Paleographer specializing in Odia Paper Manuscripts.
+                        prompt = f"""
+                        You are an expert Paleographer specializing in {doc_language} Paper Manuscripts.
                         Analyze this image of a 'Janma Patrika'.
                         
                         **YOUR MISSION: Read Handwriting (Blue Ink) Precisely.**
@@ -223,22 +250,21 @@ def main():
                         2. **FIND THE PLACE:** Look for 'Gram' or 'Jilla'. Check for 'Sambalpur', 'Rayagada', 'Jaykaypur'.
                         3. **CONFIRM TIME:** Look at Odia numerals. `୫`=5, `୪`=4. (e.g. `୫୫`=55).
                         
-                        RETURN JSON: {"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "..."}
+                        RETURN JSON: {{"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "..."}}
                         """
                     else:
-                        # --- NEW: TALAPATRA PROMPT ---
-                        prompt = """
-                        You are an expert Paleographer specializing in Ancient Odia Palm Leaf (Talapatra) Manuscripts.
-                        Analyze this image. The text is etched/incised (Karani script), not printed.
-
-                        **YOUR MISSION:**
-                        1. **IGNORE PRINTED HEADERS:** There are no 'Namni' or 'Jilla' labels.
-                        2. **READ THE ETCHING:** Look for Odia numerals embedded in the long text rows or columns.
-                        3. **FIND THE CIRCLES:** If there are circular charts (Rashi Chakra), look for planetary symbols inside.
-                        4. **DETECT DATE/TIME:** Look for keywords like "Saka" (ଶକ), "San" (ସନ), or "Danda" (ଦଣ୍ଡ).
-                        5. **DETECT NAME:** Often found after "Sriman" or at the very start.
-
-                        RETURN JSON: {"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "Unknown"}
+                        # --- STRONGER TALAPATRA PROMPT ---
+                        prompt = f"""
+                        You are an expert Paleographer specializing in Ancient {doc_language} Palm Leaf (Talapatra) Manuscripts.
+                        The image has been contrast-enhanced to show the etchings.
+                        
+                        **YOUR MISSION: Decode the Incised Karani Script.**
+                        1. **IGNORE PRINTED HEADERS:** There are none. Look for the flow of text.
+                        2. **FIND NUMERALS:** Look for Odia numerals etched in the lines. They often appear in a grid or circle.
+                        3. **FIND THE CHART:** Look for the Circular Rashi Chakra. The planetary symbols are inside the wedges.
+                        4. **DETECT KEYWORDS:** Look for "Saka", "San", "Masa" (Month), "Dina" (Day).
+                        
+                        RETURN JSON: {{"name": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "city": "Unknown"}}
                         """
                     
                     response = client.models.generate_content(
