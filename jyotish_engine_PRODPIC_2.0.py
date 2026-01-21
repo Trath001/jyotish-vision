@@ -17,7 +17,7 @@ try:
 except Exception as e:
     pass
 
-# --- THEME: "MIDAS TOUCH" (NATIVE CONTAINERS) ---
+# --- THEME: "MIDAS TOUCH" (TITANIUM CSS OVERRIDES) ---
 def inject_midas_css():
     st.markdown("""
         <style>
@@ -27,78 +27,98 @@ def inject_midas_css():
         .stApp {
             background-color: #050b14;
             background-image: 
-                radial-gradient(at 50% 0%, rgba(212, 175, 55, 0.1) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.8) 0px, transparent 50%);
+                radial-gradient(at 50% 0%, rgba(212, 175, 55, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.9) 0px, transparent 50%);
             font-family: 'Inter', sans-serif;
         }
 
-        /* 2. FORCE TEXT VISIBILITY (High Contrast) */
-        h1, h2, h3, h4, h5, h6, p, label, div, span, button {
-            color: #ffffff !important;
-        }
-        .stMarkdown p {
-            color: #e2e8f0 !important; /* Slight off-white for paragraphs */
-        }
-
-        /* 3. HEADERS (Gold) */
-        h1, h2, h3 {
+        /* 2. TEXT COLOR FORCE (White/Gold) */
+        h1, h2, h3, h4 {
             font-family: 'Cinzel', serif !important;
             background: linear-gradient(to right, #ffd700, #ffecb3, #d4af37);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0px 2px 15px rgba(212, 175, 55, 0.4);
+            text-shadow: 0px 2px 12px rgba(212, 175, 55, 0.3);
             font-weight: 700 !important;
         }
+        p, label, span, div, small {
+            color: #e2e8f0 !important;
+        }
 
-        /* 4. NATIVE CARD STYLING (The Fix for Empty Boxes) */
-        /* This targets st.container(border=True) */
+        /* 3. NATIVE CONTAINER BORDERS (The Gold Box) */
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            background-color: rgba(30, 41, 59, 0.4);
-            border: 1px solid rgba(212, 175, 55, 0.4) !important;
+            background-color: rgba(30, 41, 59, 0.3);
+            border: 1px solid rgba(212, 175, 55, 0.2) !important;
             border-radius: 12px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            padding: 1rem;
+            backdrop-filter: blur(8px);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
         }
 
-        /* 5. INPUT FIELDS & DROPDOWNS */
-        .stTextInput > div > div > input {
-            background-color: #0f172a !important;
-            color: #ffffff !important;
-            border: 1px solid #334155 !important;
+        /* 4. CRITICAL FIX: INPUTS & DATE PICKERS (Removing White Boxes) */
+        /* Target the container of the input */
+        div[data-baseweb="input"] {
+            background-color: #1e293b !important;
+            border: 1px solid #475569 !important; 
+            border-radius: 6px;
         }
-        .stSelectbox > div > div {
-            background-color: #0f172a !important;
-            color: #ffffff !important;
-            border: 1px solid #334155 !important;
+        /* Target the actual input text area */
+        div[data-baseweb="input"] > div {
+            background-color: transparent !important;
         }
-        /* Fix Dropdown Menu Items */
+        input {
+            color: #ffffff !important;
+            caret-color: #fbbf24; /* Gold cursor */
+        }
+        
+        /* 5. CRITICAL FIX: FILE UPLOADER (Removing White Box) */
+        [data-testid="stFileUploaderDropzone"] {
+            background-color: #1e293b !important;
+            border: 1px dashed #d4af37 !important;
+            border-radius: 10px;
+        }
+        [data-testid="stFileUploaderDropzone"] div, 
+        [data-testid="stFileUploaderDropzone"] span, 
+        [data-testid="stFileUploaderDropzone"] small {
+            color: #cbd5e1 !important;
+        }
+        /* Button inside uploader */
+        [data-testid="stFileUploaderDropzone"] button {
+            background: #334155 !important;
+            color: white !important;
+            border: 1px solid #64748b !important;
+        }
+
+        /* 6. SELECT/DROPDOWN BOXES */
+        div[data-baseweb="select"] > div {
+            background-color: #1e293b !important;
+            border: 1px solid #475569 !important;
+            color: white !important;
+        }
+        /* Dropdown options list */
+        ul[data-baseweb="menu"] {
+            background-color: #0f172a !important;
+        }
         ul[data-baseweb="menu"] li {
-            background-color: #0f172a !important;
             color: #ffffff !important;
         }
-
-        /* 6. BUTTONS (Liquid Gold) */
+        
+        /* 7. BUTTONS (Liquid Gold Gradient) */
         div.stButton > button {
             background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
-            color: #000 !important;
-            font-weight: 800;
+            color: #000 !important; /* Black text on Gold */
             border: none;
+            font-weight: 800;
+            padding: 0.6rem 1.2rem;
             text-transform: uppercase;
             letter-spacing: 1px;
+            border-radius: 8px;
             transition: all 0.3s ease;
         }
         div.stButton > button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
             color: #fff !important;
-        }
-
-        /* 7. FILE UPLOADER */
-        div[data-testid="stFileUploader"] {
-            background-color: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            padding: 10px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -122,13 +142,10 @@ class JyotishEngine:
             chart_data[name] = {"sign": self.rashi_names[int(pos/30)], "degree": round(pos%30, 2)}
         asc_val = (swe.houses(jd, lat, lon)[1][0] - ayanamsa) % 360
         chart_data["Ascendant"] = {"sign": self.rashi_names[int(asc_val/30)], "degree": round(asc_val%30, 2)}
-        
-        # Mahadasha
         moon_abs = (self.rashi_names.index(chart_data["Moon"]["sign"]) * 30) + chart_data["Moon"]["degree"]
         nak_idx = int(moon_abs / 13.33333333)
         balance = 1 - ((moon_abs % 13.33333333) / 13.33333333)
         start_lord = nak_idx % 9
-        # Simple projection for display
         chart_data["Current_Mahadasha"] = f"{self.dasha_lords[start_lord]} (Balance: {int(balance * self.dasha_years[start_lord])} yrs)"
         return chart_data
 
@@ -153,7 +170,6 @@ class JyotishEngine:
                     match = False; break
             if match: candidates.append(current_date)
             current_date += delta
-        
         for cand in candidates:
             d = cand - datetime.timedelta(days=20)
             limit = cand + datetime.timedelta(days=20)
@@ -200,28 +216,30 @@ def main():
     inject_midas_css()
     engine = JyotishEngine()
     
+    # Init State
     if 'form_dob' not in st.session_state: st.session_state['form_dob'] = None
     if 'ai_planets' not in st.session_state: st.session_state['ai_planets'] = {"Jupiter": "Unknown", "Saturn": "Unknown", "Rahu": "Unknown", "Mars": "Unknown"}
     if 'chart_data' not in st.session_state:
-        # Pre-load chart to avoid empty box
+        # Placeholder Chart
         st.session_state['chart_data'] = engine.calculate_chart(1990, 1, 1, 12, 0, 21.46, 83.98)
 
-    # --- HEADER ---
+    # --- TOP HEADER ---
     st.markdown("## 🕉️ VedaVision Pro")
-    
-    # --- TABS (De-clutter) ---
-    tab1, tab2 = st.tabs(["📊 DASHBOARD", "⚙️ SETTINGS"])
+    st.caption("AI-Powered Manuscript Decoder & Precision Kundli Engine")
 
-    # === TAB 1: WORKSPACE ===
+    # --- TABS (Separation of Concerns) ---
+    tab1, tab2 = st.tabs(["📊 DASHBOARD", "⚙️ CONFIGURATION"])
+
+    # === TAB 1: DASHBOARD ===
     with tab1:
-        col_L, col_R = st.columns([1, 1.2], gap="medium")
+        col_L, col_R = st.columns([1, 1.3], gap="medium")
 
-        # LEFT COLUMN
+        # LEFT COLUMN: INPUTS
         with col_L:
-            # 1. SCANNER CARD (Native Container)
+            # 1. SCANNER CARD
             with st.container(border=True):
                 st.markdown("### 📜 1. Manuscript Decoder")
-                uploaded = st.file_uploader("Upload Image", label_visibility="collapsed", type=["jpg", "png"])
+                uploaded = st.file_uploader("Upload Manuscript Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
                 
                 if uploaded and st.button("👁️ SCAN IMAGE"):
                     with st.spinner("Decoding Ancient Script..."):
@@ -234,13 +252,13 @@ def main():
                             data = json.loads(resp.text[resp.text.find('{'):resp.text.rfind('}')+1])
                             for p, s in data.get('positions', {}).items():
                                 if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
-                            st.success("Planets Detected!")
-                        except: st.error("Manual Entry Required")
+                            st.success("Planets Detected Successfully!")
+                        except: st.error("Could not read image. Please enter planets manually.")
 
             # 2. VERIFICATION CARD
             with st.container(border=True):
                 st.markdown("### 🕵️ 2. Verification & Date Finder")
-                st.caption("If date is unknown, verify planets to calculate it.")
+                st.caption("Verify detected planets below to calculate the lost birth date.")
                 
                 ropts = ["Unknown"] + engine.rashi_names
                 c1, c2 = st.columns(2)
@@ -256,9 +274,9 @@ def main():
                     if found:
                         st.session_state['form_dob'] = found
                         st.success(f"Recovered Date: {found}")
-                    else: st.error("No exact match 1900-2005")
+                    else: st.error("No exact match found. Try adjusting fast-moving planets (Mars).")
 
-        # RIGHT COLUMN
+        # RIGHT COLUMN: OUTPUT
         with col_R:
             with st.container(border=True):
                 st.markdown("### ✨ Janma Kundli")
@@ -266,38 +284,38 @@ def main():
                 # Input Form
                 c_a, c_b = st.columns(2)
                 with c_a:
-                    name = st.text_input("Name", "Unknown User")
-                    # FIX: Start from 1800 to avoid range errors
+                    name = st.text_input("Name", value="Unknown")
+                    # FIX: Start date range from 1800
                     d_val = st.session_state['form_dob'] if st.session_state['form_dob'] else datetime.date(1990,1,1)
                     dob = st.date_input("Date", d_val, min_value=datetime.date(1800,1,1))
                 with c_b:
-                    city = st.text_input("Place", "Sambalpur")
+                    city = st.text_input("Place", value="Sambalpur")
                     tob = st.time_input("Time", datetime.time(12,0))
                 
                 if st.button("GENERATE CHART"):
-                    lat, lon = (21.46, 83.98) # Default Sambalpur
+                    lat, lon = (21.46, 83.98) 
                     st.session_state['chart_data'] = engine.calculate_chart(dob.year, dob.month, dob.day, tob.hour, tob.minute, lat, lon)
                     st.rerun()
 
-                # Chart Display
+                # Chart Render
                 st.markdown(engine.generate_svg(st.session_state['chart_data']), unsafe_allow_html=True)
                 
-                # Stats
+                # Info Cards
                 k1, k2 = st.columns(2)
                 k1.info(f"**Ascendant:** {st.session_state['chart_data'].get('Ascendant', {}).get('sign', '-')}")
                 k2.success(f"**Dasha:** {st.session_state['chart_data'].get('Current_Mahadasha', '-')}")
 
-    # === TAB 2: SETTINGS ===
+    # === TAB 2: CONFIG ===
     with tab2:
         with st.container(border=True):
-            st.markdown("### ⚙️ Global Configuration")
+            st.markdown("### ⚙️ Global Settings")
             c1, c2 = st.columns(2)
             with c1:
-                st.selectbox("Manuscript Language", ["Odia", "Sanskrit", "Hindi"])
-                st.radio("Document Type", ["Palm Leaf (Talapatra)", "Paper"])
+                st.selectbox("Script Language", ["Odia", "Sanskrit", "Hindi"])
+                st.radio("Manuscript Type", ["Palm Leaf (Talapatra)", "Paper"])
             with c2:
-                st.select_slider("Rotation Correction", options=[0, 90, 180, 270])
-                st.caption("Adjust these settings before scanning new images.")
+                st.select_slider("Image Rotation", options=[0, 90, 180, 270])
+            st.caption("Settings apply to the next scan operation.")
 
 if __name__ == "__main__":
     main()
