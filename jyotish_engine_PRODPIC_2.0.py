@@ -18,38 +18,51 @@ try:
 except Exception as e:
     pass
 
-# --- THEME: "MIDAS TOUCH" (TITANIUM CSS) ---
+# --- HELPER: ROBUST DATE/TIME PARSING ---
+def parse_fuzzy_date(date_str):
+    """Tries multiple formats to parse the date string."""
+    if not date_str: return None
+    formats = [
+        "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", 
+        "%d.%m.%Y", "%d %B %Y", "%d %b %Y"
+    ]
+    for fmt in formats:
+        try:
+            return datetime.datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+def parse_fuzzy_time(time_str):
+    """Tries multiple formats to parse the time string."""
+    if not time_str: return None
+    formats = ["%H:%M", "%I:%M %p", "%H.%M", "%I.%M %p"]
+    for fmt in formats:
+        try:
+            return datetime.datetime.strptime(time_str, fmt).time()
+        except ValueError:
+            continue
+    return None
+
+# --- THEME: MIDAS TOUCH (TITANIUM CSS) ---
 def inject_midas_css():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap');
-
-        /* 1. MAIN BACKGROUND */
         .stApp {
             background-color: #050b14;
-            background-image: 
-                radial-gradient(at 50% 0%, rgba(212, 175, 55, 0.08) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.9) 0px, transparent 50%);
+            background-image: radial-gradient(at 50% 0%, rgba(212, 175, 55, 0.08) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.9) 0px, transparent 50%);
             font-family: 'Inter', sans-serif;
         }
-
-        /* 2. TEXT VISIBILITY */
-        h1, h2, h3, h4, h5, h6, p, label, div, span, button {
-            color: #ffffff !important;
-        }
+        h1, h2, h3, h4, p, label, div, span, button { color: #ffffff !important; }
         .stMarkdown p { color: #e2e8f0 !important; }
-
-        /* 3. GOLD HEADERS */
         h1, h2, h3 {
             font-family: 'Cinzel', serif !important;
             background: linear-gradient(to right, #ffd700, #ffecb3, #d4af37);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0px 2px 12px rgba(212, 175, 55, 0.3);
             font-weight: 700 !important;
         }
-
-        /* 4. NATIVE CONTAINERS */
         div[data-testid="stVerticalBlockBorderWrapper"] {
             background-color: rgba(30, 41, 59, 0.3);
             border: 1px solid rgba(212, 175, 55, 0.2) !important;
@@ -58,41 +71,23 @@ def inject_midas_css():
             padding: 1.5rem;
             margin-bottom: 1rem;
         }
-
-        /* 5. INPUT FIXES (No White Boxes) */
-        div[data-baseweb="input"] {
+        div[data-baseweb="input"], div[data-baseweb="select"] > div {
             background-color: #1e293b !important;
             border: 1px solid #475569 !important; 
             border-radius: 6px;
         }
         div[data-baseweb="input"] > div { background-color: transparent !important; }
         input { color: #ffffff !important; caret-color: #fbbf24; }
-        
-        /* 6. DROPDOWN FIXES */
-        div[data-baseweb="select"] > div {
-            background-color: #1e293b !important;
-            border: 1px solid #475569 !important;
-            color: white !important;
-        }
-        ul[data-baseweb="menu"] { background-color: #0f172a !important; }
-        ul[data-baseweb="menu"] li { color: #ffffff !important; }
-        
-        /* 7. FILE UPLOADER FIX */
         [data-testid="stFileUploaderDropzone"] {
             background-color: #1e293b !important;
             border: 1px dashed #d4af37 !important;
             border-radius: 10px;
-        }
-        [data-testid="stFileUploaderDropzone"] div, [data-testid="stFileUploaderDropzone"] span, [data-testid="stFileUploaderDropzone"] small {
-            color: #cbd5e1 !important;
         }
         [data-testid="stFileUploaderDropzone"] button {
             background: #334155 !important;
             color: white !important;
             border: 1px solid #64748b !important;
         }
-
-        /* 8. GOLD BUTTONS */
         div.stButton > button {
             background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
             color: #000 !important;
@@ -102,12 +97,6 @@ def inject_midas_css():
             text-transform: uppercase;
             letter-spacing: 1px;
             border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-        div.stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
-            color: #fff !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -230,7 +219,7 @@ def main():
                 st.markdown("### 📜 1. Manuscript Decoder")
                 
                 # --- VISIBLE TOGGLE FOR MODE ---
-                mode = st.radio("Document Type", ["Palm Leaf (Talapatra)", "Paper (Text)"], horizontal=True)
+                mode = st.radio("Document Type", ["Paper (Text/Ink)", "Palm Leaf (Talapatra)"], horizontal=True)
                 
                 uploaded = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
                 
@@ -240,25 +229,26 @@ def main():
                             img = Image.open(uploaded)
                             st.image(img, caption="Scanning...", use_column_width=True)
                             
-                            # --- PROMPT LOGIC ---
-                            if mode == "Paper (Text)":
+                            # --- RESTORED TEXT PROMPT ---
+                            if mode == "Paper (Text/Ink)":
                                 prompt = """
-                                Analyze this Paper Horoscope.
-                                1. OCR Extract 'Name'.
-                                2. OCR Extract 'Date of Birth' (YYYY-MM-DD).
-                                3. OCR Extract 'Time of Birth' (HH:MM).
-                                4. If chart is visible, extract planet signs.
+                                Analyze this Paper Horoscope/Janma Patrika.
+                                1. OCR Extract 'Name' (Look for Name/Namni).
+                                2. OCR Extract 'Date of Birth' (Look for DOB, Date, or Odia Numerals like ୧୯୭୯).
+                                3. OCR Extract 'Time of Birth' (Look for TOB, Time, AM/PM).
+                                4. If a Rashi Chakra (Chart) is drawn, identify planet signs (Gu, Sha, Ra, Ma).
+                                
                                 RETURN JSON:
                                 {
                                     "name": "Text found",
-                                    "date": "YYYY-MM-DD",
+                                    "date": "YYYY-MM-DD or DD-MM-YYYY",
                                     "time": "HH:MM",
                                     "positions": {"Jupiter": "Sign", "Saturn": "Sign"}
                                 }
                                 """
                             else:
                                 prompt = """
-                                Analyze this Palm Leaf.
+                                Analyze this Palm Leaf Chart.
                                 Identify planetary symbols: Gu(Jup), Sha(Sat), Ra(Rahu), Ma(Mars).
                                 RETURN JSON: {"positions": {"Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign"}}
                                 """
@@ -270,19 +260,23 @@ def main():
                             if json_match:
                                 data = json.loads(json_match.group())
                                 
-                                # Update State
+                                # Update State with ROBUST PARSING
                                 if data.get('name'): st.session_state['form_name'] = data['name']
+                                
+                                # Robust Date
                                 if data.get('date'): 
-                                    try: st.session_state['form_dob'] = datetime.datetime.strptime(data['date'], "%Y-%m-%d").date()
-                                    except: pass
+                                    parsed_date = parse_fuzzy_date(data['date'])
+                                    if parsed_date: st.session_state['form_dob'] = parsed_date
+                                
+                                # Robust Time
                                 if data.get('time'):
-                                    try: st.session_state['form_tob'] = datetime.datetime.strptime(data['time'], "%H:%M").time()
-                                    except: pass
+                                    parsed_time = parse_fuzzy_time(data['time'])
+                                    if parsed_time: st.session_state['form_tob'] = parsed_time
                                     
                                 for p, s in data.get('positions', {}).items():
                                     if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
                                 
-                                st.success("Scan Complete!")
+                                st.success(f"Scan Complete! Found: {st.session_state['form_name']}")
                                 st.rerun()
                             else:
                                 st.error("AI response was not valid JSON.")
