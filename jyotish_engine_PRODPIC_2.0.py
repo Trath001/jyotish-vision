@@ -5,6 +5,7 @@ import datetime
 from geopy.geocoders import Nominatim
 from PIL import Image, ImageEnhance, ImageOps
 import json
+import re
 
 # --- CONFIGURATION ---
 try:
@@ -56,22 +57,20 @@ def inject_midas_css():
         }
 
         /* 4. CRITICAL FIX: INPUTS & DATE PICKERS (Removing White Boxes) */
-        /* Target the container of the input */
         div[data-baseweb="input"] {
             background-color: #1e293b !important;
             border: 1px solid #475569 !important; 
             border-radius: 6px;
         }
-        /* Target the actual input text area */
         div[data-baseweb="input"] > div {
             background-color: transparent !important;
         }
         input {
             color: #ffffff !important;
-            caret-color: #fbbf24; /* Gold cursor */
+            caret-color: #fbbf24;
         }
         
-        /* 5. CRITICAL FIX: FILE UPLOADER (Removing White Box) */
+        /* 5. CRITICAL FIX: FILE UPLOADER */
         [data-testid="stFileUploaderDropzone"] {
             background-color: #1e293b !important;
             border: 1px dashed #d4af37 !important;
@@ -82,7 +81,6 @@ def inject_midas_css():
         [data-testid="stFileUploaderDropzone"] small {
             color: #cbd5e1 !important;
         }
-        /* Button inside uploader */
         [data-testid="stFileUploaderDropzone"] button {
             background: #334155 !important;
             color: white !important;
@@ -95,7 +93,6 @@ def inject_midas_css():
             border: 1px solid #475569 !important;
             color: white !important;
         }
-        /* Dropdown options list */
         ul[data-baseweb="menu"] {
             background-color: #0f172a !important;
         }
@@ -106,7 +103,7 @@ def inject_midas_css():
         /* 7. BUTTONS (Liquid Gold Gradient) */
         div.stButton > button {
             background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
-            color: #000 !important; /* Black text on Gold */
+            color: #000 !important;
             border: none;
             font-weight: 800;
             padding: 0.6rem 1.2rem;
@@ -217,48 +214,90 @@ def main():
     engine = JyotishEngine()
     
     # Init State
+    if 'form_name' not in st.session_state: st.session_state['form_name'] = ""
     if 'form_dob' not in st.session_state: st.session_state['form_dob'] = None
+    if 'form_tob' not in st.session_state: st.session_state['form_tob'] = datetime.time(12,0)
     if 'ai_planets' not in st.session_state: st.session_state['ai_planets'] = {"Jupiter": "Unknown", "Saturn": "Unknown", "Rahu": "Unknown", "Mars": "Unknown"}
     if 'chart_data' not in st.session_state:
-        # Placeholder Chart
         st.session_state['chart_data'] = engine.calculate_chart(1990, 1, 1, 12, 0, 21.46, 83.98)
 
-    # --- TOP HEADER ---
+    # --- HEADER ---
     st.markdown("## 🕉️ VedaVision Pro")
     st.caption("AI-Powered Manuscript Decoder & Precision Kundli Engine")
 
-    # --- TABS (Separation of Concerns) ---
+    # --- TABS ---
     tab1, tab2 = st.tabs(["📊 DASHBOARD", "⚙️ CONFIGURATION"])
 
     # === TAB 1: DASHBOARD ===
     with tab1:
         col_L, col_R = st.columns([1, 1.3], gap="medium")
 
-        # LEFT COLUMN: INPUTS
+        # LEFT COLUMN
         with col_L:
             # 1. SCANNER CARD
             with st.container(border=True):
                 st.markdown("### 📜 1. Manuscript Decoder")
-                uploaded = st.file_uploader("Upload Manuscript Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
+                
+                # Check config setting
+                ms_type = st.session_state.get('ms_type', 'Palm Leaf (Talapatra)')
+                st.caption(f"Current Mode: **{ms_type}**")
+
+                uploaded = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
                 
                 if uploaded and st.button("👁️ SCAN IMAGE"):
-                    with st.spinner("Decoding Ancient Script..."):
+                    with st.spinner("Analyzing Document..."):
                         try:
                             img = Image.open(uploaded)
                             st.image(img, caption="Scanning...", use_column_width=True)
-                            prompt = """Identify Rashi positions for Jupiter, Saturn, Rahu, Mars. 
-                            RETURN JSON: {"positions": {"Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign"}}"""
+                            
+                            # --- DUAL MODE LOGIC (THE FIX) ---
+                            if ms_type == "Paper":
+                                # MODE 1: OCR TEXT READER
+                                prompt = """
+                                Analyze this Horoscope Document.
+                                1. Read the 'Name' written in English or Odia.
+                                2. Read 'Date of Birth' (DOB) and 'Time of Birth' (TOB).
+                                3. If a Rashi Chakra is visible, identify planet signs.
+                                RETURN JSON:
+                                {
+                                    "name": "Text found",
+                                    "date": "YYYY-MM-DD",
+                                    "time": "HH:MM",
+                                    "positions": {"Jupiter": "Sign", "Saturn": "Sign"}
+                                }
+                                """
+                            else:
+                                # MODE 2: SYMBOL READER
+                                prompt = """
+                                Analyze this Palm Leaf Chart.
+                                Identify planetary symbols: Gu(Jup), Sha(Sat), Ra(Rahu), Ma(Mars).
+                                RETURN JSON: {"positions": {"Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign"}}
+                                """
+                            
                             resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
-                            data = json.loads(resp.text[resp.text.find('{'):resp.text.rfind('}')+1])
+                            txt = resp.text
+                            data = json.loads(txt[txt.find('{'):txt.rfind('}')+1])
+
+                            # Update State
+                            if data.get('name'): st.session_state['form_name'] = data['name']
+                            if data.get('date'): 
+                                try: st.session_state['form_dob'] = datetime.datetime.strptime(data['date'], "%Y-%m-%d").date()
+                                except: pass
+                            if data.get('time'):
+                                try: st.session_state['form_tob'] = datetime.datetime.strptime(data['time'], "%H:%M").time()
+                                except: pass
+                                
                             for p, s in data.get('positions', {}).items():
                                 if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
-                            st.success("Planets Detected Successfully!")
-                        except: st.error("Could not read image. Please enter planets manually.")
+                            
+                            st.success("Scan Complete!")
+                            st.rerun()
+                        except: st.error("Could not read image. Please enter details manually.")
 
             # 2. VERIFICATION CARD
             with st.container(border=True):
                 st.markdown("### 🕵️ 2. Verification & Date Finder")
-                st.caption("Verify detected planets below to calculate the lost birth date.")
+                st.caption("Verify planets below to calculate date (if text scan failed).")
                 
                 ropts = ["Unknown"] + engine.rashi_names
                 c1, c2 = st.columns(2)
@@ -274,9 +313,9 @@ def main():
                     if found:
                         st.session_state['form_dob'] = found
                         st.success(f"Recovered Date: {found}")
-                    else: st.error("No exact match found. Try adjusting fast-moving planets (Mars).")
+                    else: st.error("No exact match found. Try adjusting Mars.")
 
-        # RIGHT COLUMN: OUTPUT
+        # RIGHT COLUMN
         with col_R:
             with st.container(border=True):
                 st.markdown("### ✨ Janma Kundli")
@@ -284,13 +323,12 @@ def main():
                 # Input Form
                 c_a, c_b = st.columns(2)
                 with c_a:
-                    name = st.text_input("Name", value="Unknown")
-                    # FIX: Start date range from 1800
+                    name = st.text_input("Name", value=st.session_state['form_name'])
                     d_val = st.session_state['form_dob'] if st.session_state['form_dob'] else datetime.date(1990,1,1)
                     dob = st.date_input("Date", d_val, min_value=datetime.date(1800,1,1))
                 with c_b:
                     city = st.text_input("Place", value="Sambalpur")
-                    tob = st.time_input("Time", datetime.time(12,0))
+                    tob = st.time_input("Time", value=st.session_state['form_tob'])
                 
                 if st.button("GENERATE CHART"):
                     lat, lon = (21.46, 83.98) 
@@ -300,7 +338,6 @@ def main():
                 # Chart Render
                 st.markdown(engine.generate_svg(st.session_state['chart_data']), unsafe_allow_html=True)
                 
-                # Info Cards
                 k1, k2 = st.columns(2)
                 k1.info(f"**Ascendant:** {st.session_state['chart_data'].get('Ascendant', {}).get('sign', '-')}")
                 k2.success(f"**Dasha:** {st.session_state['chart_data'].get('Current_Mahadasha', '-')}")
@@ -312,10 +349,10 @@ def main():
             c1, c2 = st.columns(2)
             with c1:
                 st.selectbox("Script Language", ["Odia", "Sanskrit", "Hindi"])
-                st.radio("Manuscript Type", ["Palm Leaf (Talapatra)", "Paper"])
+                st.session_state['ms_type'] = st.radio("Manuscript Type", ["Palm Leaf (Talapatra)", "Paper"], key="ms_type_radio")
             with c2:
                 st.select_slider("Image Rotation", options=[0, 90, 180, 270])
-            st.caption("Settings apply to the next scan operation.")
+            st.info("ℹ️ Select 'Paper' to enable Blue Ink Text Reading (Name/DOB).")
 
 if __name__ == "__main__":
     main()
