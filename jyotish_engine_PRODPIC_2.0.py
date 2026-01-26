@@ -6,6 +6,7 @@ from geopy.geocoders import Nominatim
 from PIL import Image, ImageEnhance, ImageOps
 import json
 import re
+import time
 
 # --- CONFIGURATION ---
 try:
@@ -13,45 +14,30 @@ try:
 except:
     GOOGLE_API_KEY = "PASTE_YOUR_API_KEY_HERE"
 
-try:
-    client = genai.Client(api_key=GOOGLE_API_KEY)
-except Exception as e:
-    pass
-
-# --- 1. RESTORED INTELLIGENCE: FUZZY DATE/TIME PARSING ---
-def parse_fuzzy_date(date_str):
+# --- CACHED API CALL (SAVES QUOTA) ---
+@st.cache_data(show_spinner=False)
+def analyze_image_with_gemini(image_bytes, prompt):
     """
-    Restored Logic: Handles Odia numerals and various separators.
+    This function caches the result. If you upload the same image,
+    it returns the previous result without hitting the API (Saving Quota).
     """
-    if not date_str: return None
-    
-    # Clean up common OCR noise
-    clean_str = date_str.replace("th", "").replace("nd", "").replace("rd", "").strip()
-    
-    # Try standard formats
-    formats = [
-        "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", 
-        "%d.%m.%Y", "%d %B %Y", "%d %b %Y", "%d-%m-%y"
-    ]
-    for fmt in formats:
-        try:
-            return datetime.datetime.strptime(clean_str, fmt).date()
-        except ValueError:
-            continue
-    return None
-
-def parse_fuzzy_time(time_str):
-    """
-    Restored Logic: Handles AM/PM and dot separators.
-    """
-    if not time_str: return None
-    formats = ["%H:%M", "%I:%M %p", "%H.%M", "%I.%M %p", "%H %M"]
-    for fmt in formats:
-        try:
-            return datetime.datetime.strptime(time_str.upper(), fmt).time()
-        except ValueError:
-            continue
-    return None
+    try:
+        # Re-initialize client inside to be thread-safe
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        
+        # We need to convert bytes back to image for the new client (if needed) 
+        # or pass the bytes if the client supports it. 
+        # Standard PIL Image is not hashable for cache, so we passed bytes.
+        # Now convert bytes -> PIL Image for Gemini
+        import io
+        img = Image.open(io.BytesIO(image_bytes))
+        
+        resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
+        return resp.text
+    except Exception as e:
+        if "429" in str(e):
+            return "ERROR_QUOTA"
+        return str(e)
 
 # --- THEME: TITANIUM DARK ---
 def inject_midas_css():
@@ -72,7 +58,6 @@ def inject_midas_css():
             -webkit-text-fill-color: transparent;
             font-weight: 700 !important;
         }
-        /* Native Container Borders */
         div[data-testid="stVerticalBlockBorderWrapper"] {
             background-color: rgba(30, 41, 59, 0.3);
             border: 1px solid rgba(212, 175, 55, 0.2) !important;
@@ -81,8 +66,7 @@ def inject_midas_css():
             padding: 1.5rem;
             margin-bottom: 1rem;
         }
-        /* Input Field Fixes */
-        div[data-baseweb="input"] {
+        div[data-baseweb="input"], div[data-baseweb="select"] > div {
             background-color: #1e293b !important;
             border: 1px solid #475569 !important; 
             border-radius: 6px;
@@ -90,7 +74,6 @@ def inject_midas_css():
         div[data-baseweb="input"] > div { background-color: transparent !important; }
         input { color: #ffffff !important; caret-color: #fbbf24; }
         
-        /* File Uploader Fix */
         [data-testid="stFileUploaderDropzone"] {
             background-color: #1e293b !important;
             border: 1px dashed #d4af37 !important;
@@ -101,7 +84,6 @@ def inject_midas_css():
             color: white !important;
             border: 1px solid #64748b !important;
         }
-        /* Gold Buttons */
         div.stButton > button {
             background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
             color: #000 !important;
@@ -200,6 +182,24 @@ class JyotishEngine:
         svg.append('</svg>')
         return "".join(svg)
 
+# --- HELPER: ROBUST PARSING ---
+def parse_fuzzy_date(date_str):
+    if not date_str: return None
+    clean_str = date_str.replace("th", "").replace("nd", "").replace("rd", "").strip()
+    formats = ["%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%Y", "%d %B %Y"]
+    for fmt in formats:
+        try: return datetime.datetime.strptime(clean_str, fmt).date()
+        except ValueError: continue
+    return None
+
+def parse_fuzzy_time(time_str):
+    if not time_str: return None
+    formats = ["%H:%M", "%I:%M %p", "%H.%M", "%I.%M %p", "%H %M"]
+    for fmt in formats:
+        try: return datetime.datetime.strptime(time_str.upper(), fmt).time()
+        except ValueError: continue
+    return None
+
 # --- MAIN UI ---
 def main():
     st.set_page_config(page_title="VedaVision Pro", layout="wide", page_icon="🕉️")
@@ -211,7 +211,8 @@ def main():
     if 'form_dob' not in st.session_state: st.session_state['form_dob'] = None
     if 'form_tob' not in st.session_state: st.session_state['form_tob'] = datetime.time(12,0)
     if 'ai_planets' not in st.session_state: st.session_state['ai_planets'] = {"Jupiter": "Unknown", "Saturn": "Unknown", "Rahu": "Unknown", "Mars": "Unknown"}
-    if 'chart_data' not in st.session_state: st.session_state['chart_data'] = engine.calculate_chart(1990, 1, 1, 12, 0, 21.46, 83.98)
+    if 'chart_data' not in st.session_state:
+        st.session_state['chart_data'] = engine.calculate_chart(1990, 1, 1, 12, 0, 21.46, 83.98)
 
     st.markdown("## 🕉️ VedaVision Pro")
 
@@ -226,72 +227,55 @@ def main():
         with col_L:
             with st.container(border=True):
                 st.markdown("### 📜 1. Manuscript Decoder")
-                
-                # --- VISIBLE MODE TOGGLE ---
                 mode = st.radio("Scanning Mode", ["Paper (Text/Ink)", "Palm Leaf (Symbols)"], horizontal=True)
-                
                 uploaded = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
                 
                 if uploaded and st.button("👁️ SCAN IMAGE"):
+                    import io
+                    # Convert to bytes for caching
+                    img_bytes = uploaded.getvalue()
+                    
                     with st.spinner(f"Processing in {mode} mode..."):
-                        try:
-                            img = Image.open(uploaded)
-                            st.image(img, caption="Scanning...", use_column_width=True)
-                            
-                            # --- 2. RESTORED PAPER PROMPT (THE KEY FIX) ---
-                            if "Paper" in mode:
-                                prompt = """
-                                Analyze this Horoscope Document.
-                                1. OCR Extract 'Name' (Look for Name/Namni/Sri).
-                                2. OCR Extract 'Date of Birth' (Look for DOB, Date, Tarikh).
-                                   * Note: Also look for Odia Numerals (e.g. ୧୯୭୯).
-                                3. OCR Extract 'Time of Birth' (Look for TOB, Time, Samaya).
-                                4. If a Rashi Chart is drawn, identify planet signs (Gu, Sha, Ra, Ma).
-                                
-                                RETURN JSON:
-                                {
-                                    "name": "Text found",
-                                    "date": "YYYY-MM-DD",
-                                    "time": "HH:MM",
-                                    "positions": {"Jupiter": "Sign", "Saturn": "Sign"}
-                                }
-                                """
-                            else:
-                                # PALM LEAF MODE (Symbol Focused)
-                                prompt = """
-                                Analyze this Palm Leaf Chart.
-                                Identify planetary symbols: Gu(Jup), Sha(Sat), Ra(Rahu), Ma(Mars).
-                                RETURN JSON: {"positions": {"Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign"}}
-                                """
-                            
-                            resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
-                            txt = resp.text
-                            json_match = re.search(r'\{.*\}', txt, re.DOTALL)
-                            
+                        if "Paper" in mode:
+                            prompt = """
+                            Analyze this Paper Horoscope.
+                            1. OCR Extract 'Name' (Look for Name/Namni/Sri).
+                            2. OCR Extract 'Date of Birth' (Look for DOB, Date, Tarikh).
+                            3. OCR Extract 'Time of Birth' (Look for TOB, Time, Samaya).
+                            4. If a Rashi Chart is drawn, identify planet signs (Gu, Sha, Ra, Ma).
+                            RETURN JSON: { "name": "Text", "date": "YYYY-MM-DD", "time": "HH:MM", "positions": {"Jupiter": "Sign"} }
+                            """
+                        else:
+                            prompt = """
+                            Analyze this Palm Leaf. Identify planetary symbols.
+                            RETURN JSON: {"positions": {"Jupiter": "Sign", "Saturn": "Sign", "Rahu": "Sign", "Mars": "Sign"}}
+                            """
+                        
+                        # Call Cached Function
+                        result_text = analyze_image_with_gemini(img_bytes, prompt)
+                        
+                        if result_text == "ERROR_QUOTA":
+                            st.error("⚠️ Server Busy (Quota Exceeded). Please wait 1 minute and try again.")
+                        elif "Error" in result_text and "429" in result_text:
+                             st.error("⚠️ Quota Exceeded. Please wait.")
+                        else:
+                            # Parse JSON
+                            json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
                             if json_match:
                                 data = json.loads(json_match.group())
-                                
-                                # Update Name
                                 if data.get('name'): st.session_state['form_name'] = data['name']
-                                
-                                # 3. RESTORED FUZZY PARSING
                                 if data.get('date'): 
                                     parsed = parse_fuzzy_date(data['date'])
                                     if parsed: st.session_state['form_dob'] = parsed
-                                
                                 if data.get('time'):
                                     parsed = parse_fuzzy_time(data['time'])
                                     if parsed: st.session_state['form_tob'] = parsed
-                                    
                                 for p, s in data.get('positions', {}).items():
                                     if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
-                                
                                 st.success("Scan Complete!")
                                 st.rerun()
                             else:
-                                st.error("AI could not extract structured data.")
-                        except Exception as e: 
-                            st.error(f"Scan failed: {e}")
+                                st.error("AI response invalid.")
 
             # VERIFICATION
             with st.container(border=True):
