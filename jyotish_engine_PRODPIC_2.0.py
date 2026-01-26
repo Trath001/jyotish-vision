@@ -18,33 +18,42 @@ try:
 except Exception as e:
     pass
 
-# --- HELPER: ROBUST DATE/TIME PARSING ---
+# --- 1. RESTORED INTELLIGENCE: FUZZY DATE/TIME PARSING ---
 def parse_fuzzy_date(date_str):
-    """Tries multiple formats to parse the date string."""
+    """
+    Restored Logic: Handles Odia numerals and various separators.
+    """
     if not date_str: return None
+    
+    # Clean up common OCR noise
+    clean_str = date_str.replace("th", "").replace("nd", "").replace("rd", "").strip()
+    
+    # Try standard formats
     formats = [
         "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", 
-        "%d.%m.%Y", "%d %B %Y", "%d %b %Y"
+        "%d.%m.%Y", "%d %B %Y", "%d %b %Y", "%d-%m-%y"
     ]
     for fmt in formats:
         try:
-            return datetime.datetime.strptime(date_str, fmt).date()
+            return datetime.datetime.strptime(clean_str, fmt).date()
         except ValueError:
             continue
     return None
 
 def parse_fuzzy_time(time_str):
-    """Tries multiple formats to parse the time string."""
+    """
+    Restored Logic: Handles AM/PM and dot separators.
+    """
     if not time_str: return None
-    formats = ["%H:%M", "%I:%M %p", "%H.%M", "%I.%M %p"]
+    formats = ["%H:%M", "%I:%M %p", "%H.%M", "%I.%M %p", "%H %M"]
     for fmt in formats:
         try:
-            return datetime.datetime.strptime(time_str, fmt).time()
+            return datetime.datetime.strptime(time_str.upper(), fmt).time()
         except ValueError:
             continue
     return None
 
-# --- THEME: MIDAS TOUCH (TITANIUM CSS) ---
+# --- THEME: TITANIUM DARK ---
 def inject_midas_css():
     st.markdown("""
         <style>
@@ -63,6 +72,7 @@ def inject_midas_css():
             -webkit-text-fill-color: transparent;
             font-weight: 700 !important;
         }
+        /* Native Container Borders */
         div[data-testid="stVerticalBlockBorderWrapper"] {
             background-color: rgba(30, 41, 59, 0.3);
             border: 1px solid rgba(212, 175, 55, 0.2) !important;
@@ -71,13 +81,16 @@ def inject_midas_css():
             padding: 1.5rem;
             margin-bottom: 1rem;
         }
-        div[data-baseweb="input"], div[data-baseweb="select"] > div {
+        /* Input Field Fixes */
+        div[data-baseweb="input"] {
             background-color: #1e293b !important;
             border: 1px solid #475569 !important; 
             border-radius: 6px;
         }
         div[data-baseweb="input"] > div { background-color: transparent !important; }
         input { color: #ffffff !important; caret-color: #fbbf24; }
+        
+        /* File Uploader Fix */
         [data-testid="stFileUploaderDropzone"] {
             background-color: #1e293b !important;
             border: 1px dashed #d4af37 !important;
@@ -88,6 +101,7 @@ def inject_midas_css():
             color: white !important;
             border: 1px solid #64748b !important;
         }
+        /* Gold Buttons */
         div.stButton > button {
             background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
             color: #000 !important;
@@ -107,7 +121,6 @@ class JyotishEngine:
         self.rashi_names = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
         self.dasha_lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
         self.dasha_years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
-        self.nakshatra_names = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
     def calculate_chart(self, year, month, day, hour, minute, lat, lon):
         utc_dec = (hour + minute/60.0) - 5.5
@@ -171,7 +184,6 @@ class JyotishEngine:
             occupants[chart_data['Ascendant']['sign']].append("Asc")
             for p, data in chart_data.items():
                 if p not in ["Ascendant", "Current_Mahadasha"]: occupants[data['sign']].append(f"{p[:2]} {int(data['degree'])}°")
-
         bg = "#0f172a"; line = "#fbbf24"; text = "#f8fafc"; asc = "#ef4444"
         svg = [f'<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" style="background-color: {bg}; border-radius: 8px;">']
         svg.append(f'<rect x="2" y="2" width="396" height="396" fill="none" stroke="{line}" stroke-width="2"/>')
@@ -199,54 +211,53 @@ def main():
     if 'form_dob' not in st.session_state: st.session_state['form_dob'] = None
     if 'form_tob' not in st.session_state: st.session_state['form_tob'] = datetime.time(12,0)
     if 'ai_planets' not in st.session_state: st.session_state['ai_planets'] = {"Jupiter": "Unknown", "Saturn": "Unknown", "Rahu": "Unknown", "Mars": "Unknown"}
-    if 'chart_data' not in st.session_state:
-        st.session_state['chart_data'] = engine.calculate_chart(1990, 1, 1, 12, 0, 21.46, 83.98)
+    if 'chart_data' not in st.session_state: st.session_state['chart_data'] = engine.calculate_chart(1990, 1, 1, 12, 0, 21.46, 83.98)
 
-    # --- HEADER ---
     st.markdown("## 🕉️ VedaVision Pro")
 
-    # --- TABS ---
+    # TABS
     tab1, tab2 = st.tabs(["📊 DASHBOARD", "⚙️ SETTINGS"])
 
     # === TAB 1: DASHBOARD ===
     with tab1:
         col_L, col_R = st.columns([1, 1.3], gap="medium")
 
-        # LEFT COLUMN
+        # LEFT: SCANNER
         with col_L:
-            # 1. SCANNER CARD
             with st.container(border=True):
                 st.markdown("### 📜 1. Manuscript Decoder")
                 
-                # --- VISIBLE TOGGLE FOR MODE ---
-                mode = st.radio("Document Type", ["Paper (Text/Ink)", "Palm Leaf (Talapatra)"], horizontal=True)
+                # --- VISIBLE MODE TOGGLE ---
+                mode = st.radio("Scanning Mode", ["Paper (Text/Ink)", "Palm Leaf (Symbols)"], horizontal=True)
                 
                 uploaded = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
                 
                 if uploaded and st.button("👁️ SCAN IMAGE"):
-                    with st.spinner(f"Decoding {mode}..."):
+                    with st.spinner(f"Processing in {mode} mode..."):
                         try:
                             img = Image.open(uploaded)
                             st.image(img, caption="Scanning...", use_column_width=True)
                             
-                            # --- RESTORED TEXT PROMPT ---
-                            if mode == "Paper (Text/Ink)":
+                            # --- 2. RESTORED PAPER PROMPT (THE KEY FIX) ---
+                            if "Paper" in mode:
                                 prompt = """
-                                Analyze this Paper Horoscope/Janma Patrika.
-                                1. OCR Extract 'Name' (Look for Name/Namni).
-                                2. OCR Extract 'Date of Birth' (Look for DOB, Date, or Odia Numerals like ୧୯୭୯).
-                                3. OCR Extract 'Time of Birth' (Look for TOB, Time, AM/PM).
-                                4. If a Rashi Chakra (Chart) is drawn, identify planet signs (Gu, Sha, Ra, Ma).
+                                Analyze this Horoscope Document.
+                                1. OCR Extract 'Name' (Look for Name/Namni/Sri).
+                                2. OCR Extract 'Date of Birth' (Look for DOB, Date, Tarikh).
+                                   * Note: Also look for Odia Numerals (e.g. ୧୯୭୯).
+                                3. OCR Extract 'Time of Birth' (Look for TOB, Time, Samaya).
+                                4. If a Rashi Chart is drawn, identify planet signs (Gu, Sha, Ra, Ma).
                                 
                                 RETURN JSON:
                                 {
                                     "name": "Text found",
-                                    "date": "YYYY-MM-DD or DD-MM-YYYY",
+                                    "date": "YYYY-MM-DD",
                                     "time": "HH:MM",
                                     "positions": {"Jupiter": "Sign", "Saturn": "Sign"}
                                 }
                                 """
                             else:
+                                # PALM LEAF MODE (Symbol Focused)
                                 prompt = """
                                 Analyze this Palm Leaf Chart.
                                 Identify planetary symbols: Gu(Jup), Sha(Sat), Ra(Rahu), Ma(Mars).
@@ -255,38 +266,36 @@ def main():
                             
                             resp = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt, img])
                             txt = resp.text
-                            # Robust JSON extraction
                             json_match = re.search(r'\{.*\}', txt, re.DOTALL)
+                            
                             if json_match:
                                 data = json.loads(json_match.group())
                                 
-                                # Update State with ROBUST PARSING
+                                # Update Name
                                 if data.get('name'): st.session_state['form_name'] = data['name']
                                 
-                                # Robust Date
+                                # 3. RESTORED FUZZY PARSING
                                 if data.get('date'): 
-                                    parsed_date = parse_fuzzy_date(data['date'])
-                                    if parsed_date: st.session_state['form_dob'] = parsed_date
+                                    parsed = parse_fuzzy_date(data['date'])
+                                    if parsed: st.session_state['form_dob'] = parsed
                                 
-                                # Robust Time
                                 if data.get('time'):
-                                    parsed_time = parse_fuzzy_time(data['time'])
-                                    if parsed_time: st.session_state['form_tob'] = parsed_time
+                                    parsed = parse_fuzzy_time(data['time'])
+                                    if parsed: st.session_state['form_tob'] = parsed
                                     
                                 for p, s in data.get('positions', {}).items():
                                     if s in engine.rashi_names: st.session_state['ai_planets'][p] = s
                                 
-                                st.success(f"Scan Complete! Found: {st.session_state['form_name']}")
+                                st.success("Scan Complete!")
                                 st.rerun()
                             else:
-                                st.error("AI response was not valid JSON.")
+                                st.error("AI could not extract structured data.")
                         except Exception as e: 
                             st.error(f"Scan failed: {e}")
 
-            # 2. VERIFICATION CARD
+            # VERIFICATION
             with st.container(border=True):
                 st.markdown("### 🕵️ 2. Verification & Date Finder")
-                
                 ropts = ["Unknown"] + engine.rashi_names
                 c1, c2 = st.columns(2)
                 with c1:
@@ -303,12 +312,10 @@ def main():
                         st.success(f"Recovered Date: {found}")
                     else: st.error("No exact match found.")
 
-        # RIGHT COLUMN
+        # RIGHT: OUTPUT
         with col_R:
             with st.container(border=True):
                 st.markdown("### ✨ Janma Kundli")
-                
-                # Input Form
                 c_a, c_b = st.columns(2)
                 with c_a:
                     name = st.text_input("Name", value=st.session_state['form_name'])
@@ -323,7 +330,6 @@ def main():
                     st.session_state['chart_data'] = engine.calculate_chart(dob.year, dob.month, dob.day, tob.hour, tob.minute, lat, lon)
                     st.rerun()
 
-                # Chart Render
                 st.markdown(engine.generate_svg(st.session_state['chart_data']), unsafe_allow_html=True)
                 
                 k1, k2 = st.columns(2)
@@ -333,12 +339,10 @@ def main():
     # === TAB 2: CONFIG ===
     with tab2:
         with st.container(border=True):
-            st.markdown("### ⚙️ Advanced Settings")
+            st.markdown("### ⚙️ Settings")
             c1, c2 = st.columns(2)
-            with c1:
-                st.selectbox("Script Language", ["Odia", "Sanskrit", "Hindi"])
-            with c2:
-                st.select_slider("Image Rotation", options=[0, 90, 180, 270])
+            with c1: st.selectbox("Language", ["Odia", "Sanskrit", "Hindi"])
+            with c2: st.select_slider("Rotation", options=[0, 90, 180, 270])
 
 if __name__ == "__main__":
     main()
